@@ -37,6 +37,7 @@ interface Course {
   level: string;
   totalHours: number;
   modules: Module[];
+  enrollments?: { progress: number; isCompleted: boolean; certificateCode: string | null }[];
   _count: { enrollments: number };
 }
 
@@ -170,9 +171,15 @@ export default function LmsPage() {
     setSelectedCourse(course);
     const firstModule = course.modules[0] || null;
     setActiveModule(firstModule);
-    const initialProg = course.modules.length > 0 ? Math.round((1 / course.modules.length) * 100) : 100;
-    setProgress(initialProg);
-    setIssuedCertCode(null);
+    const userEnrollment = course.enrollments?.[0];
+    if (userEnrollment) {
+      setProgress(userEnrollment.progress);
+      setIssuedCertCode(userEnrollment.certificateCode || null);
+    } else {
+      const initialProg = course.modules.length > 0 ? Math.round((1 / course.modules.length) * 100) : 100;
+      setProgress(initialProg);
+      setIssuedCertCode(null);
+    }
   };
 
   const handleSelectModule = (mod: Module, index: number) => {

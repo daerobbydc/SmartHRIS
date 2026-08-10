@@ -7,10 +7,20 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
+    const employee = await prisma.employee.findFirst({
+      where: { userId: auth.userId },
+    });
+
     let courses = await prisma.lmsCourse.findMany({
       where: { isPublished: true },
       include: {
         modules: { orderBy: { order: "asc" } },
+        enrollments: employee
+          ? {
+              where: { employeeId: employee.id },
+              select: { progress: true, isCompleted: true, certificateCode: true },
+            }
+          : false,
         _count: { select: { enrollments: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -87,6 +97,12 @@ export async function GET(req: NextRequest) {
         where: { isPublished: true },
         include: {
           modules: { orderBy: { order: "asc" } },
+          enrollments: employee
+            ? {
+                where: { employeeId: employee.id },
+                select: { progress: true, isCompleted: true, certificateCode: true },
+              }
+            : false,
           _count: { select: { enrollments: true } },
         },
         orderBy: { createdAt: "desc" },
