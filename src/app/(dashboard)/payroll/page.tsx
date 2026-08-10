@@ -204,81 +204,64 @@ export default function PayrollPage() {
         </div>
       </div>
 
-      {/* Top Stat Overview */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between text-xs font-bold text-teal-600 uppercase tracking-wider">
-            <span>Total Pengeluaran Net Gaji</span>
-            <DollarSign className="h-4 w-4 text-teal-500" />
-          </div>
-          <p className="mt-3 text-3xl font-black text-slate-900 dark:text-white font-mono">
-            {formatCurrency(totalNetSalary)}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between text-xs font-bold text-rose-600 uppercase tracking-wider">
-            <span>Total Potongan PPh 21 TER</span>
-            <FileText className="h-4 w-4 text-rose-500" />
-          </div>
-          <p className="mt-3 text-3xl font-black text-rose-600 font-mono">
-            {formatCurrency(totalPPh21)}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between text-xs font-bold text-emerald-600 uppercase tracking-wider">
-            <span>Total Potongan BPJS TK/Kes</span>
-            <ShieldCheck className="h-4 w-4 text-emerald-500" />
-          </div>
-          <p className="mt-3 text-3xl font-black text-emerald-600 font-mono">
-            {formatCurrency(totalBPJS)}
-          </p>
-        </div>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari NIK atau Nama Karyawan..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-4 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
-            />
+      {/* Prominent Periode Penggajian Selector Bar */}
+      <div className="rounded-2xl border-2 border-teal-500/30 bg-gradient-to-r from-teal-900/10 via-slate-900/5 to-teal-900/10 p-5 shadow-sm dark:bg-slate-900">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-600 text-white shadow-lg shadow-teal-600/30">
+              <Clock className="h-6 w-6" />
+            </div>
+            <div>
+              <span className="text-[11px] font-extrabold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
+                PERIODE PENGGAJIAN TERPILIH
+              </span>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white">
+                {months.find((m) => m.value === selectedMonth)?.label} {selectedYear}
+              </h2>
+            </div>
           </div>
 
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-            className="rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2 text-xs font-bold text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          >
-            {months.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+              <span className="text-xs font-bold text-slate-500 pl-2">Bulan:</span>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                className="rounded-lg bg-slate-100 dark:bg-slate-700 px-3 py-1.5 text-xs font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                {months.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
 
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2 text-xs font-bold text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          >
-            {[2024, 2025, 2026, 2027].map((y) => (
-              <option key={y} value={y}>
-                Tahun {y}
-              </option>
-            ))}
-          </select>
+              <span className="text-xs font-bold text-slate-500 pl-2">Tahun:</span>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="rounded-lg bg-slate-100 dark:bg-slate-700 px-3 py-1.5 text-xs font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                {[2024, 2025, 2026, 2027].map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari NIK atau Nama Karyawan..."
+                className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+              />
+            </div>
+          </div>
         </div>
-
-        <span className="text-xs font-bold text-slate-500">
-          Menampilkan {filteredPayrolls.length} Slip Gaji Karyawan
-        </span>
       </div>
 
       {/* Main Payroll Table */}
