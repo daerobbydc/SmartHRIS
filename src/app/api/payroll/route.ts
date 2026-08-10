@@ -115,15 +115,6 @@ export async function POST(request: NextRequest) {
     const totalDeduction = deduction + pph21Result.pph21 + bpjsTK.jhtEmployee + bpjsTK.jpEmployee + bpjsKes.employee;
     const netSalary = Math.max(0, grossIncome - totalDeduction);
 
-    // Check if payroll record already exists for this employee, month, and year
-    const existing = await prisma.payroll.findFirst({
-      where: {
-        employeeId: employee.id,
-        month,
-        year,
-      },
-    });
-
     const updateData = {
       baseSalary,
       allowance,
@@ -152,22 +143,23 @@ export async function POST(request: NextRequest) {
       paidAt: new Date(),
     };
 
-    let payroll;
-    if (existing) {
-      payroll = await prisma.payroll.update({
-        where: { id: existing.id },
-        data: updateData,
-      });
-    } else {
-      payroll = await prisma.payroll.create({
-        data: {
-          ...updateData,
+    const payroll = await prisma.payroll.upsert({
+      where: {
+        employeeId_month_year: {
+          employeeId: employee.id,
           month,
           year,
-          employee: { connect: { id: employee.id } },
         },
-      });
-    }
+      },
+      update: updateData,
+      create: {
+        employeeId: employee.id,
+        month,
+        year,
+        ...updateData,
+      },
+    });
+
     return NextResponse.json(payroll, { status: 201 });
   } catch (error) {
     console.error("Payroll POST error:", error);
