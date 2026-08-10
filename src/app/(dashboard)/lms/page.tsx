@@ -52,21 +52,86 @@ export default function LmsPage() {
   const [progress, setProgress] = useState<number>(0);
   const [issuedCertCode, setIssuedCertCode] = useState<string | null>(null);
 
+  interface FormModule {
+    id?: string;
+    title: string;
+    contentType: string;
+    durationMin: number;
+    contentUrl: string;
+    bodyText: string;
+  }
+
   // CRUD Modal State
   const [showCrudModal, setShowCrudModal] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    title: string;
+    description: string;
+    category: string;
+    level: string;
+    totalHours: number;
+    modules: FormModule[];
+  }>({
     title: "",
     description: "",
     category: "Onboarding & HR",
     level: "BEGINNER",
     totalHours: 2,
-    moduleTitle: "",
-    contentType: "VIDEO",
-    durationMin: 15,
-    contentUrl: "",
-    bodyText: "",
+    modules: [
+      {
+        title: "Modul 1: Standar Operational Procedure",
+        contentType: "DOCUMENT",
+        durationMin: 20,
+        contentUrl: "/documents/SOP_HR_2026.pdf",
+        bodyText: "Panduan alur kerja dan etika operasional kantor.",
+      },
+      {
+        title: "Modul 2: Video Pelatihan Budaya Kerja",
+        contentType: "VIDEO",
+        durationMin: 30,
+        contentUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        bodyText: "Video tutorial simulasi situasi kerja sehari-hari.",
+      },
+      {
+        title: "Modul 3: Kuis Pemahaman & Evaluasi",
+        contentType: "QUIZ",
+        durationMin: 15,
+        contentUrl: "",
+        bodyText: "Ujian evaluasi pilihan ganda.",
+      },
+    ],
   });
+
+  const handleAddModule = () => {
+    setForm((prev) => ({
+      ...prev,
+      modules: [
+        ...prev.modules,
+        {
+          title: `Modul ${prev.modules.length + 1}: Judul Modul`,
+          contentType: "VIDEO",
+          durationMin: 15,
+          contentUrl: "",
+          bodyText: "",
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveModule = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      modules: prev.modules.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleUpdateModule = (index: number, field: keyof FormModule, value: any) => {
+    setForm((prev) => {
+      const updatedMods = [...prev.modules];
+      updatedMods[index] = { ...updatedMods[index], [field]: value };
+      return { ...prev, modules: updatedMods };
+    });
+  };
 
   const fetchCourses = async () => {
     setLoading(true);
@@ -102,11 +167,29 @@ export default function LmsPage() {
       category: "Onboarding & HR",
       level: "BEGINNER",
       totalHours: 2,
-      moduleTitle: "Modul 1: Pengenalan Dasar",
-      contentType: "VIDEO",
-      durationMin: 20,
-      contentUrl: "https://www.youtube.com/watch?v=demo",
-      bodyText: "",
+      modules: [
+        {
+          title: "Modul 1: Standar Operational Procedure",
+          contentType: "DOCUMENT",
+          durationMin: 20,
+          contentUrl: "/documents/SOP_HR_2026.pdf",
+          bodyText: "Panduan alur kerja dan etika operasional kantor.",
+        },
+        {
+          title: "Modul 2: Video Pelatihan Budaya Kerja",
+          contentType: "VIDEO",
+          durationMin: 30,
+          contentUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          bodyText: "Video tutorial simulasi situasi kerja sehari-hari.",
+        },
+        {
+          title: "Modul 3: Kuis Pemahaman & Evaluasi",
+          contentType: "QUIZ",
+          durationMin: 15,
+          contentUrl: "",
+          bodyText: "Ujian evaluasi pilihan ganda.",
+        },
+      ],
     });
     setShowCrudModal(true);
   };
@@ -114,18 +197,31 @@ export default function LmsPage() {
   const handleOpenEditModal = (course: Course, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingCourseId(course.id);
-    const firstMod = course.modules[0];
     setForm({
       title: course.title,
       description: course.description,
       category: course.category,
       level: course.level,
       totalHours: course.totalHours,
-      moduleTitle: firstMod?.title || "",
-      contentType: firstMod?.contentType || "VIDEO",
-      durationMin: firstMod?.durationMin || 15,
-      contentUrl: firstMod?.contentUrl || "",
-      bodyText: firstMod?.bodyText || "",
+      modules:
+        course.modules && course.modules.length > 0
+          ? course.modules.map((m) => ({
+              id: m.id,
+              title: m.title,
+              contentType: m.contentType || "VIDEO",
+              durationMin: m.durationMin || 15,
+              contentUrl: m.contentUrl || "",
+              bodyText: m.bodyText || "",
+            }))
+          : [
+              {
+                title: "Modul 1: Pengenalan Dasar",
+                contentType: "VIDEO",
+                durationMin: 20,
+                contentUrl: "",
+                bodyText: "",
+              },
+            ],
     });
     setShowCrudModal(true);
   };
@@ -134,7 +230,7 @@ export default function LmsPage() {
     e.preventDefault();
     try {
       if (editingCourseId) {
-        // Edit course & module via PUT
+        // Edit course & modules via PUT
         const res = await fetch("/api/lms/courses", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -556,78 +652,114 @@ export default function LmsPage() {
                 />
               </div>
 
-              <div className="rounded-2xl border border-teal-200/80 bg-teal-50/40 p-4 dark:border-teal-900/40 dark:bg-teal-950/30 space-y-3">
-                <div className="text-xs font-extrabold text-teal-800 dark:text-teal-300 flex items-center gap-1.5">
-                  <Video className="h-4 w-4 text-teal-600" /> Modul & Materi Pembelajaran Utama
+              {/* Dynamic Multi-Module Builder */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <BookOpen className="h-4 w-4 text-teal-600" /> Daftar Modul Pembelajaran ({form.modules.length} Modul)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddModule}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-teal-600 hover:text-teal-700 dark:text-teal-400"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Tambah Modul Baru
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Judul Modul
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Judul Modul (Misal: Modul 1: Standar Operational Procedure)"
-                    value={form.moduleTitle}
-                    onChange={(e) => setForm({ ...form, moduleTitle: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Tipe Materi
-                    </label>
-                    <select
-                      value={form.contentType}
-                      onChange={(e) => setForm({ ...form, contentType: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                <div className="max-h-[300px] overflow-y-auto space-y-3 pr-1">
+                  {form.modules.map((mod, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-2xl border border-teal-200/80 bg-teal-50/40 p-4 dark:border-teal-900/40 dark:bg-teal-950/30 space-y-2.5 relative"
                     >
-                      <option value="VIDEO">VIDEO (YouTube / MP4 Streaming)</option>
-                      <option value="DOCUMENT">DOCUMENT (Materi Bacaan / PDF)</option>
-                      <option value="QUIZ">QUIZ (Evaluasi Pemahaman)</option>
-                    </select>
-                  </div>
+                      <div className="flex items-center justify-between border-b border-teal-100 dark:border-teal-900/50 pb-2">
+                        <span className="text-xs font-extrabold text-teal-800 dark:text-teal-300">
+                          Modul #{idx + 1}
+                        </span>
+                        {form.modules.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveModule(idx)}
+                            className="text-slate-400 hover:text-red-600 transition"
+                            title="Hapus Modul Ini"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Durasi Modul (Menit)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="Menit"
-                      value={form.durationMin}
-                      onChange={(e) => setForm({ ...form, durationMin: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold"
-                    />
-                  </div>
-                </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Judul Modul
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={`Judul Modul ${idx + 1}`}
+                          value={mod.title}
+                          onChange={(e) => handleUpdateModule(idx, "title", e.target.value)}
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Tautan Video / File PDF (Opsional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="https://www.youtube.com/watch?v=... atau /documents/SOP.pdf"
-                    value={form.contentUrl}
-                    onChange={(e) => setForm({ ...form, contentUrl: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-mono text-[11px]"
-                  />
-                </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Tipe Materi
+                          </label>
+                          <select
+                            value={mod.contentType}
+                            onChange={(e) => handleUpdateModule(idx, "contentType", e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                          >
+                            <option value="VIDEO">VIDEO (YouTube / Streaming)</option>
+                            <option value="DOCUMENT">DOCUMENT (Materi Bacaan / PDF)</option>
+                            <option value="QUIZ">QUIZ (Evaluasi Pemahaman)</option>
+                          </select>
+                        </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Teks Rincian & Isi Materi Pembelajaran
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Isi teks panduan, poin penting, atau petunjuk pengerjaan..."
-                    value={form.bodyText}
-                    onChange={(e) => setForm({ ...form, bodyText: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  />
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Durasi Modul (Menit)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="Menit"
+                            value={mod.durationMin}
+                            onChange={(e) => handleUpdateModule(idx, "durationMin", Number(e.target.value))}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Tautan Video / File PDF (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="https://www.youtube.com/watch?v=... atau /documents/file.pdf"
+                          value={mod.contentUrl}
+                          onChange={(e) => handleUpdateModule(idx, "contentUrl", e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-mono text-[11px]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Teks Rincian & Isi Materi Pembelajaran
+                        </label>
+                        <textarea
+                          rows={2}
+                          placeholder="Isi teks panduan atau deskripsi materi..."
+                          value={mod.bodyText}
+                          onChange={(e) => handleUpdateModule(idx, "bodyText", e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 

@@ -114,11 +114,33 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, description, category, level, totalHours } = body;
+    const { title, description, category, level, totalHours, modules } = body;
 
     if (!title || !description || !category) {
       return NextResponse.json({ error: "Judul, deskripsi, dan kategori wajib diisi" }, { status: 400 });
     }
+
+    const moduleList = Array.isArray(modules) && modules.length > 0
+      ? modules.map((m: any, idx: number) => ({
+          title: m.title || `Modul ${idx + 1}`,
+          contentType: m.contentType || "VIDEO",
+          durationMin: Number(m.durationMin || 15),
+          contentUrl: m.contentUrl || null,
+          bodyText: m.bodyText || null,
+          order: idx + 1,
+        }))
+      : body.moduleTitle
+      ? [
+          {
+            title: body.moduleTitle,
+            contentType: body.contentType || "VIDEO",
+            durationMin: Number(body.durationMin || 15),
+            contentUrl: body.contentUrl || null,
+            bodyText: body.bodyText || null,
+            order: 1,
+          },
+        ]
+      : undefined;
 
     const course = await prisma.lmsCourse.create({
       data: {
@@ -127,19 +149,7 @@ export async function POST(req: NextRequest) {
         category,
         level: level || "BEGINNER",
         totalHours: Number(totalHours || 1),
-        modules: {
-          create: body.moduleTitle
-            ? [
-                {
-                  title: body.moduleTitle,
-                  contentType: body.contentType || "VIDEO",
-                  durationMin: Number(body.durationMin || 15),
-                  contentUrl: body.contentUrl || null,
-                  bodyText: body.bodyText || null,
-                },
-              ]
-            : undefined,
-        },
+        modules: moduleList ? { create: moduleList } : undefined,
       },
     });
 
@@ -150,7 +160,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT - Update LMS course & module (HR/Admin only)
+// PUT - Update LMS course & modules (HR/Admin only)
 export async function PUT(req: NextRequest) {
   const auth = await checkAuth(req);
   if (auth instanceof NextResponse) return auth;
@@ -164,7 +174,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { courseId, title, description, category, level, totalHours, isPublished, moduleTitle, contentType, durationMin, contentUrl, bodyText } = body;
+    const { courseId, title, description, category, level, totalHours, isPublished, modules, moduleTitle, contentType, durationMin, contentUrl, bodyText } = body;
 
     if (!courseId) {
       return NextResponse.json({ error: "courseId wajib diisi" }, { status: 400 });
@@ -182,7 +192,22 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    if (moduleTitle) {
+    if (Array.isArray(modules)) {
+      await prisma.lmsModule.deleteMany({ where: { courseId } });
+      if (modules.length > 0) {
+        await prisma.lmsModule.createMany({
+          data: modules.map((m: any, idx: number) => ({
+            courseId,
+            title: m.title || `Modul ${idx + 1}`,
+            contentType: m.contentType || "VIDEO",
+            durationMin: Number(m.durationMin || 15),
+            contentUrl: m.contentUrl || null,
+            bodyText: m.bodyText || null,
+            order: idx + 1,
+          })),
+        });
+      }
+    } else if (moduleTitle) {
       const existingModule = await prisma.lmsModule.findFirst({
         where: { courseId },
         orderBy: { order: "asc" },
