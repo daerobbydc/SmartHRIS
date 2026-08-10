@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT - Update LMS course (HR/Admin only)
+// PUT - Update LMS course & module (HR/Admin only)
 export async function PUT(req: NextRequest) {
   const auth = await checkAuth(req);
   if (auth instanceof NextResponse) return auth;
@@ -164,7 +164,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { courseId, title, description, category, level, totalHours, isPublished } = body;
+    const { courseId, title, description, category, level, totalHours, isPublished, moduleTitle, contentType, durationMin, contentUrl, bodyText } = body;
 
     if (!courseId) {
       return NextResponse.json({ error: "courseId wajib diisi" }, { status: 400 });
@@ -181,6 +181,38 @@ export async function PUT(req: NextRequest) {
         isPublished: isPublished != null ? Boolean(isPublished) : undefined,
       },
     });
+
+    if (moduleTitle) {
+      const existingModule = await prisma.lmsModule.findFirst({
+        where: { courseId },
+        orderBy: { order: "asc" },
+      });
+
+      if (existingModule) {
+        await prisma.lmsModule.update({
+          where: { id: existingModule.id },
+          data: {
+            title: moduleTitle,
+            contentType: contentType || "VIDEO",
+            durationMin: Number(durationMin || 15),
+            contentUrl: contentUrl || null,
+            bodyText: bodyText || null,
+          },
+        });
+      } else {
+        await prisma.lmsModule.create({
+          data: {
+            courseId,
+            title: moduleTitle,
+            contentType: contentType || "VIDEO",
+            durationMin: Number(durationMin || 15),
+            contentUrl: contentUrl || null,
+            bodyText: bodyText || null,
+            order: 1,
+          },
+        });
+      }
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error: any) {

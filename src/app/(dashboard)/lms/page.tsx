@@ -65,6 +65,7 @@ export default function LmsPage() {
     contentType: "VIDEO",
     durationMin: 15,
     contentUrl: "",
+    bodyText: "",
   });
 
   const fetchCourses = async () => {
@@ -105,6 +106,7 @@ export default function LmsPage() {
       contentType: "VIDEO",
       durationMin: 20,
       contentUrl: "https://www.youtube.com/watch?v=demo",
+      bodyText: "",
     });
     setShowCrudModal(true);
   };
@@ -112,16 +114,18 @@ export default function LmsPage() {
   const handleOpenEditModal = (course: Course, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingCourseId(course.id);
+    const firstMod = course.modules[0];
     setForm({
       title: course.title,
       description: course.description,
       category: course.category,
       level: course.level,
       totalHours: course.totalHours,
-      moduleTitle: course.modules[0]?.title || "",
-      contentType: course.modules[0]?.contentType || "VIDEO",
-      durationMin: course.modules[0]?.durationMin || 15,
-      contentUrl: course.modules[0]?.contentUrl || "",
+      moduleTitle: firstMod?.title || "",
+      contentType: firstMod?.contentType || "VIDEO",
+      durationMin: firstMod?.durationMin || 15,
+      contentUrl: firstMod?.contentUrl || "",
+      bodyText: firstMod?.bodyText || "",
     });
     setShowCrudModal(true);
   };
@@ -130,17 +134,13 @@ export default function LmsPage() {
     e.preventDefault();
     try {
       if (editingCourseId) {
-        // Edit course via PUT
+        // Edit course & module via PUT
         const res = await fetch("/api/lms/courses", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             courseId: editingCourseId,
-            title: form.title,
-            description: form.description,
-            category: form.category,
-            level: form.level,
-            totalHours: form.totalHours,
+            ...form,
           }),
         });
 
@@ -556,27 +556,80 @@ export default function LmsPage() {
                 />
               </div>
 
-              {!editingCourseId && (
-                <div className="rounded-2xl border border-teal-200/80 bg-teal-50/40 p-4 dark:border-teal-900/40 dark:bg-teal-950/30 space-y-2.5">
-                  <div className="text-xs font-extrabold text-teal-800 dark:text-teal-300 flex items-center gap-1.5">
-                    <Video className="h-4 w-4 text-teal-600" /> Modul Utama (Perdana)
-                  </div>
+              <div className="rounded-2xl border border-teal-200/80 bg-teal-50/40 p-4 dark:border-teal-900/40 dark:bg-teal-950/30 space-y-3">
+                <div className="text-xs font-extrabold text-teal-800 dark:text-teal-300 flex items-center gap-1.5">
+                  <Video className="h-4 w-4 text-teal-600" /> Modul & Materi Pembelajaran Utama
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Judul Modul
+                  </label>
                   <input
                     type="text"
-                    placeholder="Judul Modul 1 (Misal: Pengenalan Etika Kantor)"
+                    placeholder="Judul Modul (Misal: Modul 1: Standar Operational Procedure)"
                     value={form.moduleTitle}
                     onChange={(e) => setForm({ ...form, moduleTitle: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Tipe Materi
+                    </label>
+                    <select
+                      value={form.contentType}
+                      onChange={(e) => setForm({ ...form, contentType: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    >
+                      <option value="VIDEO">VIDEO (YouTube / MP4 Streaming)</option>
+                      <option value="DOCUMENT">DOCUMENT (Materi Bacaan / PDF)</option>
+                      <option value="QUIZ">QUIZ (Evaluasi Pemahaman)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Durasi Modul (Menit)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Menit"
+                      value={form.durationMin}
+                      onChange={(e) => setForm({ ...form, durationMin: Number(e.target.value) })}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Tautan Video / File PDF (Opsional)
+                  </label>
                   <input
                     type="text"
-                    placeholder="Link URL Video / Embed PDF (Opsional)"
+                    placeholder="https://www.youtube.com/watch?v=... atau /documents/SOP.pdf"
                     value={form.contentUrl}
                     onChange={(e) => setForm({ ...form, contentUrl: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-mono text-[11px]"
                   />
                 </div>
-              )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Teks Rincian & Isi Materi Pembelajaran
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Isi teks panduan, poin penting, atau petunjuk pengerjaan..."
+                    value={form.bodyText}
+                    onChange={(e) => setForm({ ...form, bodyText: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </div>
+              </div>
 
               {/* Form Action Buttons */}
               <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
