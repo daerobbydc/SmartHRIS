@@ -19,6 +19,8 @@ import {
   Maximize2,
   RotateCcw,
   Sparkles,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -113,6 +115,68 @@ export default function AbsensiOnlinePage() {
     longitude: "",
     radiusMeters: "150",
   });
+
+  const [showEditOfficeModal, setShowEditOfficeModal] = useState(false);
+  const [editingOffice, setEditingOffice] = useState<{
+    id: string;
+    name: string;
+    address: string;
+    latitude: string;
+    longitude: string;
+    radiusMeters: string;
+  } | null>(null);
+
+  const handleOpenEditOffice = (office: OfficeLocation) => {
+    setEditingOffice({
+      id: office.id,
+      name: office.name,
+      address: office.address || "",
+      latitude: office.latitude.toString(),
+      longitude: office.longitude.toString(),
+      radiusMeters: office.radiusMeters.toString(),
+    });
+    setShowEditOfficeModal(true);
+  };
+
+  const handleUpdateOffice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOffice) return;
+    try {
+      const res = await fetch(`/api/absensi/office-locations?id=${editingOffice.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingOffice),
+      });
+
+      if (res.ok) {
+        setShowEditOfficeModal(false);
+        setEditingOffice(null);
+        fetchOffices();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Gagal mengedit lokasi kantor");
+      }
+    } catch (err) {
+      console.error("Error updating office location:", err);
+    }
+  };
+
+  const handleDeleteOffice = async (id: string, name: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus lokasi kantor "${name}"?`)) return;
+    try {
+      const res = await fetch(`/api/absensi/office-locations?id=${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchOffices();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Gagal menghapus lokasi kantor");
+      }
+    } catch (err) {
+      console.error("Error deleting office location:", err);
+    }
+  };
 
   // Digital Clock Timer
   useEffect(() => {
@@ -757,9 +821,29 @@ export default function AbsensiOnlinePage() {
           {/* Active Office Info Card */}
           {selectedOffice && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
-              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-teal-600" /> Detail Geofence Kantor
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-teal-600" /> Detail Geofence Kantor
+                </h3>
+                {canManage && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEditOffice(selectedOffice)}
+                      className="p-1 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 transition text-xs font-bold flex items-center gap-1 border border-amber-200 px-2 py-1"
+                      title="Edit Lokasi Kantor Ini"
+                    >
+                      <Edit className="h-3.5 w-3.5" /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteOffice(selectedOffice.id, selectedOffice.name)}
+                      className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 transition text-xs font-bold flex items-center gap-1 border border-rose-200 px-2 py-1"
+                      title="Hapus Lokasi Kantor Ini"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Hapus
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="space-y-1.5 text-xs text-gray-600">
                 <p className="font-bold text-gray-900">{selectedOffice.name}</p>
                 {selectedOffice.address && <p>{selectedOffice.address}</p>}
@@ -998,6 +1082,111 @@ export default function AbsensiOnlinePage() {
           </div>
         </form>
       </Modal>
+
+      {/* Modal Edit Lokasi Kantor */}
+      {showEditOfficeModal && editingOffice && (
+        <Modal
+          isOpen={showEditOfficeModal}
+          onClose={() => setShowEditOfficeModal(false)}
+          title="Edit Lokasi & Geofence Kantor"
+        >
+          <form onSubmit={handleUpdateOffice} className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Nama Kantor / Site *</label>
+              <input
+                type="text"
+                required
+                value={editingOffice.name}
+                onChange={(e) => setEditingOffice({ ...editingOffice, name: e.target.value })}
+                placeholder="Contoh: Kantor Cabang Bali"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Alamat</label>
+              <input
+                type="text"
+                value={editingOffice.address}
+                onChange={(e) => setEditingOffice({ ...editingOffice, address: e.target.value })}
+                placeholder="Jl. Sunset Road No. 99, Kuta"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Latitude *</label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={editingOffice.latitude}
+                  onChange={(e) => setEditingOffice({ ...editingOffice, latitude: e.target.value })}
+                  placeholder="-8.7205"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Longitude *</label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={editingOffice.longitude}
+                  onChange={(e) => setEditingOffice({ ...editingOffice, longitude: e.target.value })}
+                  placeholder="115.1691"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-mono"
+                />
+              </div>
+            </div>
+
+            {gpsLocation && (
+              <button
+                type="button"
+                onClick={() =>
+                  setEditingOffice({
+                    ...editingOffice,
+                    latitude: gpsLocation.latitude.toString(),
+                    longitude: gpsLocation.longitude.toString(),
+                  })
+                }
+                className="w-full text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl p-2 transition flex items-center justify-center gap-1.5"
+              >
+                <MapPin className="h-3.5 w-3.5" /> Gunakan Koordinat GPS Saya Saat Ini ({gpsLocation.latitude.toFixed(4)}, {gpsLocation.longitude.toFixed(4)})
+              </button>
+            )}
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Radius Toleransi Geofence (Meter) *</label>
+              <input
+                type="number"
+                required
+                value={editingOffice.radiusMeters}
+                onChange={(e) => setEditingOffice({ ...editingOffice, radiusMeters: e.target.value })}
+                placeholder="150"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-bold text-teal-700"
+              />
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowEditOfficeModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-md"
+              >
+                Simpan Perubahan Lokasi
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
     </div>
   );

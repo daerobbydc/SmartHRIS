@@ -61,9 +61,52 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(location, { status: 201 });
   } catch (error) {
     console.error("Office location POST error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "ID Lokasi wajib diisi" }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const { name, address, latitude, longitude, radiusMeters, isActive } = body;
+
+    const location = await prisma.officeLocation.update({
+      where: { id },
+      data: {
+        name: name !== undefined ? name : undefined,
+        address: address !== undefined ? address : undefined,
+        latitude: latitude !== undefined ? parseFloat(latitude) : undefined,
+        longitude: longitude !== undefined ? parseFloat(longitude) : undefined,
+        radiusMeters: radiusMeters !== undefined ? parseFloat(radiusMeters) : undefined,
+        isActive: isActive !== undefined ? Boolean(isActive) : undefined,
+      },
+    });
+
+    return NextResponse.json(location);
+  } catch (error) {
+    console.error("Office location PUT error:", error);
+    return NextResponse.json({ error: "Gagal mengedit lokasi kantor" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "ID Lokasi wajib diisi" }, { status: 400 });
+    }
+
+    await prisma.officeLocation.delete({ where: { id } });
+    return NextResponse.json({ success: true, message: "Lokasi kantor berhasil dihapus" });
+  } catch (error) {
+    console.error("Office location DELETE error:", error);
+    return NextResponse.json({ error: "Gagal menghapus lokasi kantor" }, { status: 500 });
   }
 }
