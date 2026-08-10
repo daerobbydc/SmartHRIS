@@ -13,6 +13,7 @@ import {
   Download,
   CheckCircle,
   AlertTriangle,
+  Fingerprint,
 } from "lucide-react";
 
 interface IntegrationStatus {
@@ -114,6 +115,19 @@ export default function IntegrationsPage() {
   };
 
   const integrations = [
+    {
+      id: "fingerprint",
+      name: "Mesin Fingerprint Realtime",
+      description: "Integrasi realtime Push Webhook / ADMS mesin Solution & ZKTeco",
+      icon: Fingerprint,
+      color: "bg-teal-50 text-teal-600",
+      status: true,
+      actions: (
+        <a href="/integrations/fingerprint" className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-lg text-xs font-bold transition">
+          <ExternalLink className="h-3.5 w-3.5" /> Buka Pengelola Mesin Fingerprint
+        </a>
+      ),
+    },
     {
       id: "bpjs",
       name: "BPJS Ketenagakerjaan",

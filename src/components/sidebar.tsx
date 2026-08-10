@@ -44,6 +44,7 @@ import {
   DollarSign,
   Smartphone,
   Download,
+  Fingerprint,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
@@ -142,6 +143,7 @@ const navigation: NavSection[] = [
   {
     label: "INTEGRASI & BOT",
     items: [
+      { name: "Mesin Fingerprint", href: "/integrations/fingerprint", icon: Fingerprint, permission: "settings:manage" },
       { name: "WhatsApp Bot", href: "/notifications/whatsapp", icon: MessageSquare, permission: "settings:manage" },
       { name: "Integrations", href: "/integrations", icon: Plug, permission: "settings:manage" },
       { name: "Knowledge Base", href: "/knowledge-base", icon: BookOpen, permission: "leave:read" },
