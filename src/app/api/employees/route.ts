@@ -9,6 +9,20 @@ export async function GET(request: NextRequest) {
     if (auth instanceof NextResponse) return auth;
 
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (id) {
+      const employee = await prisma.employee.findUnique({
+        where: { id },
+        include: {
+          user: { select: { email: true, role: true } },
+          attendance: { take: 5, orderBy: { date: "desc" } },
+          leaves: { take: 5, orderBy: { createdAt: "desc" } },
+        },
+      });
+      if (!employee) return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
+      return NextResponse.json({ employee });
+    }
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
     const search = searchParams.get("search") || "";
