@@ -168,9 +168,19 @@ export default function LmsPage() {
 
   const handleOpenCourse = (course: Course) => {
     setSelectedCourse(course);
-    setActiveModule(course.modules[0] || null);
-    setProgress(35); // Initial progress preview
+    const firstModule = course.modules[0] || null;
+    setActiveModule(firstModule);
+    const initialProg = course.modules.length > 0 ? Math.round((1 / course.modules.length) * 100) : 100;
+    setProgress(initialProg);
     setIssuedCertCode(null);
+  };
+
+  const handleSelectModule = (mod: Module, index: number) => {
+    setActiveModule(mod);
+    if (selectedCourse && selectedCourse.modules.length > 0) {
+      const prog = Math.round(((index + 1) / selectedCourse.modules.length) * 100);
+      setProgress(prog);
+    }
   };
 
   const handleOpenCreateModal = () => {
@@ -300,7 +310,6 @@ export default function LmsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employeeId: "emp_1",
           courseId: selectedCourse.id,
           progressPercent: 100,
         }),
@@ -309,7 +318,12 @@ export default function LmsPage() {
       if (res.ok) {
         const data = await res.json();
         setProgress(100);
-        setIssuedCertCode(data.data.certificateCode || `CERT-HRIS-${Date.now().toString().slice(-6)}`);
+        const cert = data.data?.certificateCode || `CERT-HRIS-${Date.now().toString().slice(-6)}`;
+        setIssuedCertCode(cert);
+        fetchCourses();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Gagal memproses kelulusan modul");
       }
     } catch (err) {
       console.error("Complete error:", err);
@@ -522,7 +536,7 @@ export default function LmsPage() {
                 {selectedCourse.modules.map((mod, index) => (
                   <button
                     key={mod.id || index}
-                    onClick={() => setActiveModule(mod)}
+                    onClick={() => handleSelectModule(mod, index)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
                       activeModule?.id === mod.id || activeModule?.title === mod.title
                         ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
