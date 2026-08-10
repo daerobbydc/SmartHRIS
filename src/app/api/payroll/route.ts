@@ -46,19 +46,34 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Get employee & salary data for auto-calculation
-    const employee = await prisma.employee.findUnique({
-      where: { id: body.employeeId },
+    const targetEmpId = body.employeeId;
+    if (!targetEmpId) {
+      return NextResponse.json({ error: "ID Karyawan wajib diisi" }, { status: 400 });
+    }
+
+    const employee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { id: targetEmpId },
+          { employeeId: targetEmpId },
+        ],
+      },
     });
 
     if (!employee) {
       return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
     }
 
-    const salaryData = await prisma.employeeSalary.findUnique({
-      where: { employeeId: body.employeeId },
+    const salaryData = await prisma.employeeSalary.findFirst({
+      where: {
+        OR: [
+          { employeeId: employee.id },
+          { employeeId: employee.employeeId },
+        ],
+      },
     });
 
-    const baseSalary = parseFloat(
+    const parsedBase = parseFloat(
       body.baseSalary !== undefined && body.baseSalary !== ""
         ? body.baseSalary
         : salaryData?.baseSalary
@@ -67,14 +82,15 @@ export async function POST(request: NextRequest) {
         ? employee.salary.toString()
         : "5000000"
     );
+    const baseSalary = isNaN(parsedBase) || parsedBase < 0 ? 5000000 : parsedBase;
 
-    const allowance = parseFloat(body.allowance || 0);
-    const deduction = parseFloat(body.deduction || 0);
-    const overtime = parseFloat(body.overtime || 0);
-    const bonus = parseFloat(body.bonus || 0);
-    const thr = parseFloat(body.thr || 0);
-    const month = parseInt(body.month);
-    const year = parseInt(body.year);
+    const allowance = isNaN(parseFloat(body.allowance)) ? 0 : parseFloat(body.allowance);
+    const deduction = isNaN(parseFloat(body.deduction)) ? 0 : parseFloat(body.deduction);
+    const overtime = isNaN(parseFloat(body.overtime)) ? 0 : parseFloat(body.overtime);
+    const bonus = isNaN(parseFloat(body.bonus)) ? 0 : parseFloat(body.bonus);
+    const thr = isNaN(parseFloat(body.thr)) ? 0 : parseFloat(body.thr);
+    const month = parseInt(body.month) || new Date().getMonth() + 1;
+    const year = parseInt(body.year) || new Date().getFullYear();
 
     // Auto-calculate PPh 21
     const ptkpCode = salaryData?.ptkp || employee.ptkp || "TK/0";
@@ -83,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     if (isDecember) {
       const prevPayrolls = await prisma.payroll.findMany({
-        where: { employeeId: body.employeeId, year, month: { lt: month } },
+        where: { employeeId: employee.id, year, month: { lt: month } },
       });
       previousMonthsGross = prevPayrolls.reduce((sum, p) => sum + Number(p.grossIncome), 0);
     }
@@ -102,7 +118,7 @@ export async function POST(request: NextRequest) {
     // Check if payroll record already exists for this employee, month, and year
     const existing = await prisma.payroll.findFirst({
       where: {
-        employeeId: body.employeeId,
+        employeeId: employee.id,
         month,
         year,
       },
