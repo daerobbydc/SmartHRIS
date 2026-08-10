@@ -52,6 +52,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   HR: [
     "employee:read",
     "employee:write",
+    "payroll:read",
+    "payroll:write",
+    "payroll:approve",
+    "payroll:export",
     "attendance:read",
     "attendance:write",
     "attendance:approve",

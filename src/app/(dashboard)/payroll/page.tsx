@@ -100,24 +100,37 @@ export default function PayrollPage() {
       const empData = await empRes.json();
       const emps = empData.employees || [];
 
+      let successCount = 0;
+      let failCount = 0;
+
       for (const emp of emps) {
-        await fetch("/api/payroll", {
+        const res = await fetch("/api/payroll", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             employeeId: emp.id,
             month: selectedMonth,
             year: selectedYear,
-            allowance: 1000000,
-            overtime: 350000,
+            allowance: emp.position?.toLowerCase().includes("intern") || emp.position?.toLowerCase().includes("magang") ? 350000 : 1000000,
+            overtime: emp.position?.toLowerCase().includes("intern") || emp.position?.toLowerCase().includes("magang") ? 100000 : 350000,
             deduction: 0,
           }),
         });
+
+        if (res.ok) {
+          successCount++;
+        } else {
+          failCount++;
+          const errData = await res.json().catch(() => ({}));
+          console.error(`Payroll error for ${emp.firstName}:`, errData);
+        }
       }
 
-      fetchPayrolls();
+      await fetchPayrolls();
+      alert(`Proses Penggajian Selesai!\n- Berhasil: ${successCount} Karyawan\n- Gagal: ${failCount} Karyawan`);
     } catch (error) {
       console.error("Error processing bulk payroll:", error);
+      alert("Terjadi kesalahan saat memproses penggajian.");
     } finally {
       setProcessing(false);
     }
