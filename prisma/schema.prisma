@@ -108,6 +108,7 @@ model Employee {
   lmsEnrollments      LmsEnrollment[]
   talentMatrixEntries TalentMatrix9Box[]
   paklaringDocument   PaklaringDocument?
+  biometricLogs       BiometricLog[]
 
   @@index([department])
   @@index([status])
@@ -210,6 +211,14 @@ model Attendance {
   checkInDistance  Float?
   checkOutDistance Float?
   isGeofenceValid  Boolean          @default(true)
+  clientIp         String?
+  wifiBssid        String?
+  wifiSsid         String?
+  isIpValid        Boolean          @default(true)
+  isWifiValid      Boolean          @default(true)
+  livenessScore    Float?
+  isLivenessPassed Boolean          @default(true)
+  livenessDetails  String?          @db.Text
   officeLocationId String?
   officeLocation   OfficeLocation?  @relation(fields: [officeLocationId], references: [id])
   notes            String?          @db.Text
@@ -222,16 +231,19 @@ model Attendance {
 }
 
 model OfficeLocation {
-  id           String       @id @default(cuid())
-  name         String
-  address      String?      @db.Text
-  latitude     Float
-  longitude    Float
-  radiusMeters Float        @default(100)
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  attendances  Attendance[]
+  id                 String       @id @default(cuid())
+  name               String
+  address            String?      @db.Text
+  latitude           Float
+  longitude          Float
+  radiusMeters       Float        @default(100)
+  allowedIpAddresses String?      @db.Text
+  allowedBssids      String?      @db.Text
+  requireMultiFactor Boolean      @default(false)
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  attendances        Attendance[]
 }
 
 model Overtime {
@@ -489,21 +501,25 @@ model OKR {
 
 // ==================== EMPLOYEE SELF SERVICE ====================
 model Submission {
-  id          String   @id @default(cuid())
-  employeeId  String
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  type        SubmissionType
-  title       String
-  description String?  @db.Text
-  startDate   DateTime?
-  endDate     DateTime?
-  attachment  String?
-  status      LeaveStatus @default(PENDING)
-  approvedBy  String?
-  approvedAt  DateTime?
-  rejectionReason String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  employeeId       String
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type             SubmissionType
+  title            String
+  description      String?  @db.Text
+  startDate        DateTime?
+  endDate          DateTime?
+  attachment       String?
+  attendanceId     String?
+  requestedCheckIn DateTime?
+  requestedCheckOut DateTime?
+  correctionReason String?  @db.Text
+  status           LeaveStatus @default(PENDING)
+  approvedBy       String?
+  approvedAt       DateTime?
+  rejectionReason  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
   @@index([employeeId])
   @@index([status])
 }
@@ -718,6 +734,7 @@ enum SubmissionType {
   DATA_CHANGE
   COMPLAINT
   SUGGESTION
+  ATTENDANCE_CORRECTION
 }
 
 enum AssetCategory {
@@ -1139,5 +1156,40 @@ model PaklaringDocument {
 
   @@index([employeeId])
 }
+
+// ==================== BIOMETRIC & FINGERPRINT INTEGRATION ====================
+model BiometricDevice {
+  id          String         @id @default(cuid())
+  deviceCode  String         @unique
+  name        String
+  ipAddress   String?
+  location    String?
+  secretToken String         @default(cuid())
+  status      String         @default("ONLINE")
+  lastSyncAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  logs        BiometricLog[]
+}
+
+model BiometricLog {
+  id          String           @id @default(cuid())
+  deviceId    String
+  device      BiometricDevice  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  employeePin String
+  employeeId  String?
+  employee    Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  timestamp   DateTime
+  scanType    String           @default("AUTOMATIC") // CHECK_IN, CHECK_OUT, AUTOMATIC
+  verifyMode  String           @default("FINGERPRINT") // FINGERPRINT, FACE, CARD, PASSWORD
+  isProcessed Boolean          @default(false)
+  rawPayload  String?          @db.Text
+  createdAt   DateTime         @default(now())
+
+  @@index([deviceId])
+  @@index([employeePin])
+  @@index([timestamp])
+}
+
 
 

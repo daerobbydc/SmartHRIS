@@ -116,6 +116,17 @@ export default function AbsensiOnlinePage() {
     radiusMeters: "150",
   });
 
+  // Correction Claims State
+  const [showCorrectionModal, setShowCorrectionModal] = useState<boolean>(false);
+  const [correctionClaims, setCorrectionClaims] = useState<any[]>([]);
+  const [correctionForm, setCorrectionForm] = useState({
+    targetDate: new Date().toISOString().split("T")[0],
+    requestedCheckIn: "08:00",
+    requestedCheckOut: "17:00",
+    correctionReason: "",
+  });
+  const [submittingCorrection, setSubmittingCorrection] = useState<boolean>(false);
+
   const [showEditOfficeModal, setShowEditOfficeModal] = useState(false);
   const [editingOffice, setEditingOffice] = useState<{
     id: string;
@@ -125,6 +136,60 @@ export default function AbsensiOnlinePage() {
     longitude: string;
     radiusMeters: string;
   } | null>(null);
+
+  const fetchCorrectionClaims = async () => {
+    try {
+      const res = await fetch("/api/absensi/corrections");
+      if (res.ok) {
+        const data = await res.json();
+        setCorrectionClaims(data);
+      }
+    } catch (err) {
+      console.error("Error fetching correction claims:", err);
+    }
+  };
+
+  const handleCorrectionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.user?.id) return;
+    setSubmittingCorrection(true);
+    try {
+      const checkInDateTime = `${correctionForm.targetDate}T${correctionForm.requestedCheckIn}:00`;
+      const checkOutDateTime = `${correctionForm.targetDate}T${correctionForm.requestedCheckOut}:00`;
+
+      const res = await fetch("/api/absensi/corrections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeId: session.user.id,
+          targetDate: correctionForm.targetDate,
+          requestedCheckIn: checkInDateTime,
+          requestedCheckOut: checkOutDateTime,
+          correctionReason: correctionForm.correctionReason,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage({ text: data.message || "Berhasil mengajukan koreksi!", type: "success" });
+        setShowCorrectionModal(false);
+        setCorrectionForm({
+          targetDate: new Date().toISOString().split("T")[0],
+          requestedCheckIn: "08:00",
+          requestedCheckOut: "17:00",
+          correctionReason: "",
+        });
+        fetchCorrectionClaims();
+      } else {
+        setMessage({ text: data.error || "Gagal mengajukan koreksi", type: "error" });
+      }
+    } catch (err) {
+      console.error("Correction submit error:", err);
+    } finally {
+      setSubmittingCorrection(false);
+    }
+  };
 
   const handleOpenEditOffice = (office: OfficeLocation) => {
     setEditingOffice({
@@ -189,6 +254,7 @@ export default function AbsensiOnlinePage() {
   useEffect(() => {
     fetchOffices();
     fetchAttendanceData();
+    fetchCorrectionClaims();
     requestGpsLocation();
   }, []);
 
@@ -225,6 +291,7 @@ export default function AbsensiOnlinePage() {
   const fetchAttendanceData = async () => {
     setLoading(true);
     try {
+      fetchCorrectionClaims();
       // Fetch Today's Attendance
       const todayRes = await fetch("/api/absensi?todayOnly=true");
       if (todayRes.ok) {
@@ -446,16 +513,25 @@ export default function AbsensiOnlinePage() {
           </p>
         </div>
 
-        {/* Realtime Digital Clock */}
-        <div className="flex items-center gap-4 bg-white/15 backdrop-blur-md px-5 py-3 rounded-xl border border-white/20 z-10 shrink-0">
-          <Clock className="h-8 w-8 text-teal-200" />
-          <div>
-            <p className="text-2xl font-mono font-bold tracking-wider leading-none">
-              {time ? time.toLocaleTimeString("id-ID") : "--:--:--"}
-            </p>
-            <p className="text-xs text-teal-100 mt-1">
-              {time ? time.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : ""}
-            </p>
+        {/* Realtime Digital Clock & Correction Claim Button */}
+        <div className="flex flex-wrap items-center gap-3 z-10 shrink-0">
+          <button
+            onClick={() => setShowCorrectionModal(true)}
+            className="px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs font-bold rounded-xl border border-white/30 shadow-sm transition flex items-center gap-2"
+          >
+            <Edit className="h-4 w-4" /> Ajukan Koreksi Absen
+          </button>
+
+          <div className="flex items-center gap-3 bg-white/15 backdrop-blur-md px-5 py-3 rounded-xl border border-white/20">
+            <Clock className="h-8 w-8 text-teal-200" />
+            <div>
+              <p className="text-2xl font-mono font-bold tracking-wider leading-none">
+                {time ? time.toLocaleTimeString("id-ID") : "--:--:--"}
+              </p>
+              <p className="text-xs text-teal-100 mt-1">
+                {time ? time.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : ""}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -977,6 +1053,205 @@ export default function AbsensiOnlinePage() {
           </div>
         )}
       </div>
+
+      {/* Section: Daftar Pengajuan Koreksi Absensi Terbaru */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Edit className="h-5 w-5 text-teal-600" /> Riwayat & Pengajuan Koreksi Absensi
+            </h2>
+            <p className="text-xs text-gray-500">Daftar pengajuan klaim/koreksi absen karena kendala lokasi, dinas luar, atau lupa clock-in</p>
+          </div>
+
+          <button
+            onClick={() => setShowCorrectionModal(true)}
+            className="px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-bold text-xs rounded-xl border border-teal-200 transition flex items-center gap-1.5"
+          >
+            <Plus className="h-4 w-4" /> Ajukan Koreksi
+          </button>
+        </div>
+
+        {correctionClaims.length === 0 ? (
+          <div className="py-8 text-center text-xs text-gray-500">
+            Belum ada pengajuan koreksi absensi.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
+                <tr>
+                  <th className="py-3 px-4">Tanggal Pengajuan</th>
+                  <th className="py-3 px-4">Karyawan</th>
+                  <th className="py-3 px-4">Tanggal Absen Target</th>
+                  <th className="py-3 px-4">Usulan Jam</th>
+                  <th className="py-3 px-4">Alasan Koreksi</th>
+                  <th className="py-3 px-4">Status</th>
+                  {canManage && <th className="py-3 px-4">Aksi Manager</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {correctionClaims.map((claim) => (
+                  <tr key={claim.id} className="hover:bg-gray-50/60 transition-colors">
+                    <td className="py-3 px-4 text-gray-600">
+                      {formatDate(claim.createdAt)}
+                    </td>
+                    <td className="py-3 px-4 font-semibold text-gray-900">
+                      {claim.employee ? `${claim.employee.firstName} ${claim.employee.lastName}` : "-"}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-teal-800">
+                      {formatDate(claim.startDate)}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-gray-700">
+                      In: {formatTimeString(claim.requestedCheckIn)} | Out: {formatTimeString(claim.requestedCheckOut)}
+                    </td>
+                    <td className="py-3 px-4 max-w-xs truncate text-gray-600" title={claim.correctionReason || claim.description}>
+                      {claim.correctionReason || claim.description || "-"}
+                    </td>
+                    <td className="py-3 px-4">
+                      <AnimatedBadge
+                        variant={
+                          claim.status === "APPROVED"
+                            ? "success"
+                            : claim.status === "REJECTED"
+                            ? "danger"
+                            : "warning"
+                        }
+                      >
+                        {claim.status === "APPROVED" ? "DISETUJUI" : claim.status === "REJECTED" ? "DITOLAK" : "MENUNGGU APPROVAL"}
+                      </AnimatedBadge>
+                    </td>
+                    {canManage && (
+                      <td className="py-3 px-4">
+                        {claim.status === "PENDING" ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={async () => {
+                                const res = await fetch(`/api/absensi/corrections?id=${claim.id}`, {
+                                  method: "PUT",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ status: "APPROVED", approvedBy: session?.user?.name || "HR/Admin" }),
+                                });
+                                if (res.ok) {
+                                  fetchAttendanceData();
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-sm"
+                            >
+                              Setujui
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const reason = prompt("Masukkan alasan penolakan:");
+                                if (reason) {
+                                  const res = await fetch(`/api/absensi/corrections?id=${claim.id}`, {
+                                    method: "PUT",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ status: "REJECTED", approvedBy: session?.user?.name || "HR/Admin", rejectionReason: reason }),
+                                  });
+                                  if (res.ok) {
+                                    fetchAttendanceData();
+                                  }
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] rounded-lg shadow-sm"
+                            >
+                              Tolak
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-gray-400">Oleh: {claim.approvedBy || "Manager"}</span>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal Ajukan Koreksi Absen */}
+      {showCorrectionModal && (
+        <Modal
+          isOpen={showCorrectionModal}
+          onClose={() => setShowCorrectionModal(false)}
+          title="Ajukan Koreksi / Klaim Absensi"
+        >
+          <form onSubmit={handleCorrectionSubmit} className="space-y-4">
+            <div className="bg-teal-50 border border-teal-200 p-3 rounded-xl text-xs text-teal-800 flex items-start gap-2">
+              <Info className="h-4 w-4 shrink-0 text-teal-600 mt-0.5" />
+              <p>
+                Gunakan formulir ini untuk mengajukan koreksi absen jika lupa clock-in/out, kendala jaringan, atau sedang tugas dinas luar. Pengajuan akan dikirimkan ke Atasan/HR untuk persetujuan.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Tanggal Absensi yang Dikoreksi *</label>
+              <input
+                type="date"
+                required
+                value={correctionForm.targetDate}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, targetDate: e.target.value })}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-medium"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Usulan Jam Masuk *</label>
+                <input
+                  type="time"
+                  required
+                  value={correctionForm.requestedCheckIn}
+                  onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckIn: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Usulan Jam Keluar *</label>
+                <input
+                  type="time"
+                  required
+                  value={correctionForm.requestedCheckOut}
+                  onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckOut: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-mono"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Alasan Koreksi Absen *</label>
+              <textarea
+                required
+                rows={3}
+                value={correctionForm.correctionReason}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, correctionReason: e.target.value })}
+                placeholder="Contoh: Lupa melakukan absen masuk saat kedatangan / Mati listrik di lokasi kantor / Perjalanan dinas luar kota"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm"
+              />
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowCorrectionModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={submittingCorrection}
+                className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 rounded-xl shadow-md disabled:opacity-50"
+              >
+                {submittingCorrection ? "Mengirim..." : "Kirim Pengajuan Koreksi"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {/* Modal View Full Selfie Photo */}
       <Modal

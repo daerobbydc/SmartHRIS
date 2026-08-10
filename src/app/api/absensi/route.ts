@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyGeofence } from "@/lib/geofence";
+import {
+  verifyLivenessAndAntiSpoofing,
+  verifyMultiFactorLocation,
+} from "@/lib/smart-attendance";
 
 export async function GET(request: NextRequest) {
   try {
@@ -65,6 +69,8 @@ export async function POST(request: NextRequest) {
       officeLocationId,
       photo,
       notes,
+      wifiBssid,
+      wifiSsid,
     } = body;
 
     if (!employeeId) {
@@ -73,6 +79,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Extract client IP address
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const realIp = request.headers.get("x-real-ip");
+    const clientIp = forwardedFor
+      ? forwardedFor.split(",")[0].trim()
+      : realIp || "127.0.0.1";
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -91,19 +104,48 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // 1. Perform Multi-Factor Location Check (GPS + IP + Wi-Fi)
     let distanceMeters = 0;
     let isGeofenceValid = true;
+    let isIpValid = true;
+    let isWifiValid = true;
+    let isMultiFactorPassed = true;
 
-    if (latitude !== undefined && longitude !== undefined && office) {
-      const geofenceCheck = verifyGeofence(
-        latitude,
-        longitude,
-        office.latitude,
-        office.longitude,
-        office.radiusMeters
+    if (office) {
+      const multiFactor = verifyMultiFactorLocation({
+        userLat: latitude,
+        userLng: longitude,
+        clientIp,
+        wifiBssid,
+        wifiSsid,
+        office: {
+          latitude: office.latitude,
+          longitude: office.longitude,
+          radiusMeters: office.radiusMeters,
+          allowedIpAddresses: office.allowedIpAddresses,
+          allowedBssids: office.allowedBssids,
+          requireMultiFactor: office.requireMultiFactor,
+        },
+      });
+
+      distanceMeters = multiFactor.distanceMeters;
+      isGeofenceValid = multiFactor.isGeofenceValid;
+      isIpValid = multiFactor.isIpValid;
+      isWifiValid = multiFactor.isWifiValid;
+      isMultiFactorPassed = multiFactor.isMultiFactorPassed;
+    }
+
+    // 2. Perform Facial Liveness & Anti-Spoofing Check
+    const liveness = verifyLivenessAndAntiSpoofing(photo);
+
+    if (!liveness.isLivenessPassed) {
+      return NextResponse.json(
+        {
+          error: `Verifikasi Liveness Selfie gagal: ${liveness.livenessDetails}`,
+          liveness,
+        },
+        { status: 400 }
       );
-      distanceMeters = geofenceCheck.distanceMeters;
-      isGeofenceValid = geofenceCheck.isWithin;
     }
 
     const locationName = office
@@ -139,6 +181,14 @@ export async function POST(request: NextRequest) {
           checkOutLng: longitude || null,
           checkOutDistance: distanceMeters,
           isGeofenceValid: existingAttendance.isGeofenceValid && isGeofenceValid,
+          clientIp,
+          wifiBssid: wifiBssid || null,
+          wifiSsid: wifiSsid || null,
+          isIpValid,
+          isWifiValid,
+          livenessScore: liveness.livenessScore,
+          isLivenessPassed: liveness.isLivenessPassed,
+          livenessDetails: liveness.livenessDetails,
           notes: notes ? `${existingAttendance.notes || ""}\nOut: ${notes}` : existingAttendance.notes,
         },
         include: {
@@ -151,11 +201,13 @@ export async function POST(request: NextRequest) {
         message: "Berhasil Absen Keluar!",
         attendance: updated,
         geofenceValid: isGeofenceValid,
+        isIpValid,
+        isWifiValid,
+        liveness,
         distanceMeters,
       });
     } else {
       // Default: Check-in
-      // Determine status (PRESENT or LATE - after 08:30 AM)
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       const isLate = currentHour > 8 || (currentHour === 8 && currentMinute > 30);
@@ -177,6 +229,14 @@ export async function POST(request: NextRequest) {
           checkInLng: longitude || null,
           checkInDistance: distanceMeters,
           isGeofenceValid,
+          clientIp,
+          wifiBssid: wifiBssid || null,
+          wifiSsid: wifiSsid || null,
+          isIpValid,
+          isWifiValid,
+          livenessScore: liveness.livenessScore,
+          isLivenessPassed: liveness.isLivenessPassed,
+          livenessDetails: liveness.livenessDetails,
           officeLocationId: office?.id || null,
           notes: notes || undefined,
         },
@@ -191,6 +251,14 @@ export async function POST(request: NextRequest) {
           checkInLng: longitude || null,
           checkInDistance: distanceMeters,
           isGeofenceValid,
+          clientIp,
+          wifiBssid: wifiBssid || null,
+          wifiSsid: wifiSsid || null,
+          isIpValid,
+          isWifiValid,
+          livenessScore: liveness.livenessScore,
+          isLivenessPassed: liveness.isLivenessPassed,
+          livenessDetails: liveness.livenessDetails,
           officeLocationId: office?.id || null,
           notes: notes || null,
         },
@@ -204,6 +272,9 @@ export async function POST(request: NextRequest) {
         message: isLate ? "Absen Masuk Berhasil (Terlambat)" : "Absen Masuk Berhasil!",
         attendance: upserted,
         geofenceValid: isGeofenceValid,
+        isIpValid,
+        isWifiValid,
+        liveness,
         distanceMeters,
       });
     }
@@ -215,3 +286,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
