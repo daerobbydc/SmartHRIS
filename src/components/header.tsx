@@ -200,7 +200,7 @@ export function Header() {
 
                 <div className="py-1">
                   <button
-                    onClick={() => signOut()}
+                    onClick={() => signOut({ callbackUrl: "/login" })}
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition"
                   >
                     <LogOut className="h-3.5 w-3.5" />
