@@ -149,7 +149,12 @@ export async function POST(req: NextRequest) {
 
     if (employeeEmail) {
       const emp = await prisma.employee.findFirst({
-        where: { email: employeeEmail },
+        where: {
+          OR: [
+            { user: { email: employeeEmail } },
+            { employeeId: employeeEmail },
+          ],
+        },
       });
 
       if (emp) {
