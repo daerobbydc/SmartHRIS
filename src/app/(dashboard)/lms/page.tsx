@@ -322,6 +322,10 @@ export default function LmsPage() {
       c.category.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalHours = courses.reduce((sum, c) => sum + (c.totalHours || 0), 0);
+  const totalModules = courses.reduce((sum, c) => sum + (c.modules?.length || 0), 0);
+  const totalEnrollments = courses.reduce((sum, c) => sum + (c._count?.enrollments || 0), 0);
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -361,7 +365,7 @@ export default function LmsPage() {
         </div>
       </div>
 
-      {/* KPI Hours Tracker Cards */}
+      {/* KPI Hours Tracker Cards (Real Dynamic DB Data) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center justify-between">
@@ -373,22 +377,22 @@ export default function LmsPage() {
             </div>
           </div>
           <p className="mt-3 text-3xl font-extrabold text-teal-700 dark:text-teal-400">
-            24 <span className="text-sm font-normal text-slate-500">Jam Terkumulasi</span>
+            {totalHours} <span className="text-sm font-normal text-slate-500">Jam Terkumulasi</span>
           </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Memenuhi target 20 jam/tahun</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Dihitung dari seluruh materi aktif</p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Kursus Tersedia
+              Kursus & Modul Tersedia
             </span>
             <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
               <BookOpen className="h-5 w-5" />
             </div>
           </div>
           <p className="mt-3 text-3xl font-extrabold text-slate-900 dark:text-white">
-            {courses.length} <span className="text-sm font-normal text-slate-500">Modul</span>
+            {courses.length} <span className="text-sm font-normal text-slate-500">Kursus ({totalModules} Modul)</span>
           </p>
           <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">Kategori IT, HR, & Management</p>
         </div>
@@ -403,7 +407,7 @@ export default function LmsPage() {
             </div>
           </div>
           <p className="mt-3 text-3xl font-extrabold text-amber-600 dark:text-amber-400">
-            4 <span className="text-sm font-normal text-slate-500">Sertifikat Internal</span>
+            {totalEnrollments} <span className="text-sm font-normal text-slate-500">Sertifikat Internal</span>
           </p>
           <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Dapat diunduh & diverifikasi</p>
         </div>
