@@ -139,7 +139,7 @@ export default function PayrollPage() {
   const handleDownloadPayslip = async (payroll: PayrollItem) => {
     try {
       const res = await fetch(
-        `/api/payroll/export?employeeId=${payroll.employee?.employeeId}&month=${payroll.month}&year=${payroll.year}`
+        `/api/export-pdf?type=payslip&id=${payroll.id}`
       );
 
       if (!res.ok) {
