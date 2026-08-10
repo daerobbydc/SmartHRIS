@@ -198,6 +198,84 @@ async function main() {
     console.log("Demo Payroll Andi Pratama Created");
   }
 
+  // Seed Default Salary Components (Komponen Gaji)
+  const salaryComponents = [
+    {
+      name: "Gaji Pokok Magang",
+      type: "ALLOWANCE" as const,
+      category: "Gaji Pokok",
+      amount: 1500000,
+      isTaxable: false,
+    },
+    {
+      name: "Tunjangan Transportasi",
+      type: "ALLOWANCE" as const,
+      category: "Tunjangan Operasional",
+      amount: 200000,
+      isTaxable: true,
+    },
+    {
+      name: "Uang Makan",
+      type: "ALLOWANCE" as const,
+      category: "Tunjangan Operasional",
+      amount: 150000,
+      isTaxable: true,
+    },
+    {
+      name: "Insentif Kehadiran",
+      type: "BONUS" as const,
+      category: "Insentif & Kehadiran",
+      amount: 100000,
+      isTaxable: true,
+    },
+    {
+      name: "Gaji Pokok Karyawan Tetap",
+      type: "ALLOWANCE" as const,
+      category: "Gaji Pokok",
+      amount: 5000000,
+      isTaxable: true,
+    },
+    {
+      name: "Tunjangan Jabatan / Manajerial",
+      type: "ALLOWANCE" as const,
+      category: "Tunjangan Struktural",
+      amount: 1500000,
+      isTaxable: true,
+    },
+    {
+      name: "Potongan BPJS Ketenagakerjaan (JHT + JP)",
+      type: "DEDUCTION" as const,
+      category: "Asuransi Ketenagakerjaan",
+      percentage: 3.0,
+      isTaxable: false,
+    },
+    {
+      name: "Potongan BPJS Kesehatan",
+      type: "DEDUCTION" as const,
+      category: "Asuransi Kesehatan",
+      percentage: 1.0,
+      isTaxable: false,
+    },
+    {
+      name: "Potongan Pajak PPh 21 TER",
+      type: "DEDUCTION" as const,
+      category: "Pajak Negara",
+      isTaxable: true,
+    },
+  ];
+
+  for (const comp of salaryComponents) {
+    const existing = await prisma.salaryComponent.findFirst({
+      where: { name: comp.name },
+    });
+    if (!existing) {
+      await prisma.salaryComponent.create({
+        data: comp,
+      });
+    }
+  }
+  console.log("Salary components created");
+
   // Create default office locations
   const officeCount = await prisma.officeLocation.count();
   if (officeCount === 0) {
