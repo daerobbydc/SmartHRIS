@@ -108,10 +108,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const payrollData = {
-      employeeId: body.employeeId,
-      month,
-      year,
+    const updateData = {
       baseSalary,
       allowance,
       deduction,
@@ -143,11 +140,16 @@ export async function POST(request: NextRequest) {
     if (existing) {
       payroll = await prisma.payroll.update({
         where: { id: existing.id },
-        data: payrollData,
+        data: updateData,
       });
     } else {
       payroll = await prisma.payroll.create({
-        data: payrollData,
+        data: {
+          ...updateData,
+          month,
+          year,
+          employee: { connect: { id: employee.id } },
+        },
       });
     }
     return NextResponse.json(payroll, { status: 201 });
