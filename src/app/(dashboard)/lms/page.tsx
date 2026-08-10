@@ -499,17 +499,92 @@ export default function LmsPage() {
                 </div>
               </div>
 
+              {/* Module Selection Tabs */}
+              <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-100 dark:border-slate-800">
+                {selectedCourse.modules.map((mod, index) => (
+                  <button
+                    key={mod.id || index}
+                    onClick={() => setActiveModule(mod)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
+                      activeModule?.id === mod.id || activeModule?.title === mod.title
+                        ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                    }`}
+                  >
+                    <span className="opacity-70">#{index + 1}</span> {mod.title}
+                  </button>
+                ))}
+              </div>
+
               {activeModule && (
-                <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800 bg-slate-950 text-white">
-                  <div className="flex items-center gap-2 text-xs font-bold text-teal-400 mb-2">
-                    <Video className="h-4 w-4" /> Modul {activeModule.durationMin} Menit: {activeModule.title}
-                  </div>
-                  <div className="aspect-video w-full rounded-lg bg-slate-900 flex items-center justify-center border border-slate-800">
-                    <div className="text-center p-6">
-                      <PlayCircle className="mx-auto h-12 w-12 text-teal-500 mb-2 animate-pulse" />
-                      <p className="text-xs text-slate-400">Media Player LMS SmartHRIS (Video Slide Simulasi)</p>
+                <div className="rounded-2xl border border-slate-200 p-5 dark:border-slate-800 bg-slate-950 text-white space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-teal-400">
+                      {activeModule.contentType === "VIDEO" && <Video className="h-4 w-4 text-teal-400" />}
+                      {activeModule.contentType === "DOCUMENT" && <FileText className="h-4 w-4 text-teal-400" />}
+                      {activeModule.contentType === "QUIZ" && <Sparkles className="h-4 w-4 text-teal-400" />}
+                      <span>{activeModule.contentType} • {activeModule.durationMin} Menit</span>
                     </div>
+                    <span className="text-xs font-medium text-slate-400">{activeModule.title}</span>
                   </div>
+
+                  {activeModule.contentType === "VIDEO" && (
+                    <div className="aspect-video w-full rounded-xl bg-slate-900 overflow-hidden border border-slate-800 relative flex items-center justify-center">
+                      {activeModule.contentUrl?.includes("youtube") ? (
+                        <iframe
+                          src={activeModule.contentUrl.replace("watch?v=", "embed/")}
+                          className="w-full h-full border-0"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <div className="text-center p-6">
+                          <PlayCircle className="mx-auto h-12 w-12 text-teal-500 mb-2 animate-pulse" />
+                          <p className="text-xs text-slate-300 font-bold">{activeModule.title}</p>
+                          {activeModule.contentUrl && (
+                            <a
+                              href={activeModule.contentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-block rounded-lg bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700"
+                            >
+                              Buka Stream Video ↗
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {activeModule.contentType === "DOCUMENT" && (
+                    <div className="rounded-xl bg-slate-900 p-4 border border-slate-800 space-y-2">
+                      <div className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
+                        <FileText className="h-4 w-4" /> Dokumen & Panduan Tertulis
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {activeModule.bodyText || "Materi modul bacaan panduan HR dan standar etika perusahaan."}
+                      </p>
+                      {activeModule.contentUrl && (
+                        <a
+                          href={activeModule.contentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-teal-400 hover:underline"
+                        >
+                          Unduh File Materi PDF ↗
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {activeModule.contentType === "QUIZ" && (
+                    <div className="rounded-xl bg-slate-900 p-4 border border-slate-800 space-y-2 text-center">
+                      <Sparkles className="mx-auto h-8 w-8 text-amber-400 mb-1" />
+                      <p className="text-xs font-bold text-white">Evaluasi Pemahaman (Kuis Interaktif)</p>
+                      <p className="text-xs text-slate-400">
+                        {activeModule.bodyText || "Jawablah pertanyaan evaluasi untuk menguji pemahaman materi."}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
