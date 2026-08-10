@@ -85,7 +85,7 @@ const navigation: NavSection[] = [
   {
     label: "PRESENSI & ROSTER",
     items: [
-      { name: "Absen Online", href: "/absensi", icon: Camera, permission: "attendance:write" },
+      { name: "Presensi & Absen Online", href: "/absensi", icon: Camera, permission: "attendance:write" },
       { name: "Jadwal Kerja", href: "/absensi/schedule", icon: CalendarDays, permission: "attendance:read" },
       { name: "Tukar Shift", href: "/absensi/shift-swap", icon: ArrowRightLeft, permission: "attendance:read" },
       { name: "Kerja Lembur", href: "/absensi/overtime", icon: Clock, permission: "attendance:read" },
