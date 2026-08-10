@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       },
       update: updateData,
       create: {
-        employeeId: employee.id,
+        employee: { connect: { id: employee.id } },
         month,
         year,
         ...updateData,

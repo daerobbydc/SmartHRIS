@@ -244,15 +244,16 @@ export function calculateBPJSTK(
   baseSalary: number,
   allowances: number = 0
 ) {
-  const taxableSalary = Math.min(baseSalary + allowances, BPJS_CAP.jht);
+  const grossSalary = baseSalary + allowances;
+  const jpSalary = Math.min(grossSalary, BPJS_CAP.jp);
 
   return {
-    jhtEmployee: Math.round(taxableSalary * BPJS_TK_RATES.JHT.employee),
-    jhtEmployer: Math.round(taxableSalary * BPJS_TK_RATES.JHT.employer),
-    jpEmployee: Math.round(taxableSalary * BPJS_TK_RATES.JP.employee),
-    jpEmployer: Math.round(taxableSalary * BPJS_TK_RATES.JP.employer),
-    jkk: Math.round(BPJS_CAP.jkk * BPJS_TK_RATES.JKK.employer),
-    jkm: Math.round(BPJS_CAP.jkm * BPJS_TK_RATES.JKM.employer),
+    jhtEmployee: Math.round(grossSalary * BPJS_TK_RATES.JHT.employee),
+    jhtEmployer: Math.round(grossSalary * BPJS_TK_RATES.JHT.employer),
+    jpEmployee: Math.round(jpSalary * BPJS_TK_RATES.JP.employee),
+    jpEmployer: Math.round(jpSalary * BPJS_TK_RATES.JP.employer),
+    jkk: Math.round(grossSalary * BPJS_TK_RATES.JKK.employer),
+    jkm: Math.round(grossSalary * BPJS_TK_RATES.JKM.employer),
   };
 }
 
