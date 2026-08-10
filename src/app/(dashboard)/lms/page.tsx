@@ -40,6 +40,20 @@ interface Course {
   _count: { enrollments: number };
 }
 
+function getYouTubeEmbedUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.includes("youtube.com/embed/")) return url;
+  if (url.includes("youtube.com/watch")) {
+    const match = url.match(/[?&]v=([^&]+)/);
+    if (match && match[1]) return `https://www.youtube-nocookie.com/embed/${match[1]}`;
+  }
+  if (url.includes("youtu.be/")) {
+    const id = url.split("youtu.be/")[1]?.split("?")[0];
+    if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
+  }
+  return null;
+}
+
 export default function LmsPage() {
   const { role } = usePermissions();
   const canManage = role === "ADMIN" || role === "HR";
@@ -530,27 +544,26 @@ export default function LmsPage() {
 
                   {activeModule.contentType === "VIDEO" && (
                     <div className="aspect-video w-full rounded-xl bg-slate-900 overflow-hidden border border-slate-800 relative flex items-center justify-center">
-                      {activeModule.contentUrl?.includes("youtube") ? (
+                      {getYouTubeEmbedUrl(activeModule.contentUrl) ? (
                         <iframe
-                          src={activeModule.contentUrl.replace("watch?v=", "embed/")}
+                          src={getYouTubeEmbedUrl(activeModule.contentUrl)!}
                           className="w-full h-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                           allowFullScreen
                         />
+                      ) : activeModule.contentUrl && (activeModule.contentUrl.endsWith(".mp4") || activeModule.contentUrl.endsWith(".webm")) ? (
+                        <video
+                          src={activeModule.contentUrl}
+                          controls
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
-                        <div className="text-center p-6">
-                          <PlayCircle className="mx-auto h-12 w-12 text-teal-500 mb-2 animate-pulse" />
-                          <p className="text-xs text-slate-300 font-bold">{activeModule.title}</p>
-                          {activeModule.contentUrl && (
-                            <a
-                              href={activeModule.contentUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-2 inline-block rounded-lg bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700"
-                            >
-                              Buka Stream Video ↗
-                            </a>
-                          )}
-                        </div>
+                        <iframe
+                          src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+                          className="w-full h-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
                       )}
                     </div>
                   )}
