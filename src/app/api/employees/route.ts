@@ -203,9 +203,20 @@ export async function PUT(request: NextRequest) {
     }
 
     // HR / ADMIN can update all fields
+    const { firstName, lastName, phone, address, department, position, salary, status } = body;
+
     const updated = await prisma.employee.update({
       where: { id },
-      data: body,
+      data: {
+        firstName: firstName !== undefined ? firstName : undefined,
+        lastName: lastName !== undefined ? lastName : undefined,
+        phone: phone !== undefined ? phone : undefined,
+        address: address !== undefined ? address : undefined,
+        department: department !== undefined ? department : undefined,
+        position: position !== undefined ? position : undefined,
+        salary: salary !== undefined ? parseFloat(salary) : undefined,
+        status: status !== undefined ? status : undefined,
+      },
     });
 
     return NextResponse.json(updated);

@@ -47,6 +47,9 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [showImport, setShowImport] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingEmpId, setEditingEmpId] = useState<string | null>(null);
+  const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [addForm, setAddForm] = useState({
@@ -61,6 +64,59 @@ export default function EmployeesPage() {
     salary: "8000000",
     status: "ACTIVE",
   });
+
+  const [editForm, setEditForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    department: "Engineering",
+    position: "Software Engineer",
+    salary: "8000000",
+    status: "ACTIVE",
+  });
+
+  const handleOpenEditModal = (emp: Employee) => {
+    setEditingEmpId(emp.id);
+    setEditForm({
+      firstName: emp.firstName || "",
+      lastName: emp.lastName || "",
+      phone: (emp as any).phone || "",
+      department: emp.department || "Engineering",
+      position: emp.position || "Staff",
+      salary: emp.salary ? emp.salary.toString() : "8000000",
+      status: emp.status || "ACTIVE",
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEmpId) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/employees?id=${editingEmpId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editForm,
+          salary: parseFloat(editForm.salary) || 0,
+        }),
+      });
+
+      if (res.ok) {
+        setShowEditModal(false);
+        setEditingEmpId(null);
+        fetchEmployees();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Gagal mengedit karyawan");
+      }
+    } catch (error) {
+      console.error("Error editing employee:", error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -314,20 +370,30 @@ export default function EmployeesPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Link
-                        href={`/employees/${emp.id}`}
+                      <button
+                        onClick={() => setSelectedEmp(emp)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950 transition"
+                        title="Lihat Detail Profil"
                       >
                         <Eye className="h-4 w-4" />
-                      </Link>
+                      </button>
                       {canManage && (
-                        <button
-                          onClick={() => handleDelete(emp.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 transition"
-                          title="Hapus Karyawan"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleOpenEditModal(emp)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 transition"
+                            title="Edit Data Karyawan"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(emp.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 transition"
+                            title="Hapus Karyawan"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -524,6 +590,241 @@ export default function EmployeesPage() {
                   className="rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-teal-600/20 hover:from-teal-700 hover:to-teal-800 transition disabled:opacity-50"
                 >
                   {submitting ? "Menyimpan..." : "Simpan Karyawan Baru"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Employee Detail Modal */}
+      {selectedEmp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-500/10 font-bold text-teal-600 dark:bg-teal-950 dark:text-teal-400">
+                  {selectedEmp.firstName?.[0]}{selectedEmp.lastName?.[0]}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    {selectedEmp.firstName} {selectedEmp.lastName}
+                  </h3>
+                  <p className="text-xs font-mono font-semibold text-teal-600 dark:text-teal-400">
+                    {selectedEmp.employeeId}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedEmp(null)}
+                className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase">Departemen</span>
+                  <p className="font-bold text-slate-900 dark:text-white mt-0.5">{selectedEmp.department}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase">Jabatan / Posisi</span>
+                  <p className="font-bold text-slate-900 dark:text-white mt-0.5">{selectedEmp.position}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase">Email Korporasi</span>
+                  <p className="font-bold text-slate-900 dark:text-white mt-0.5 truncate">{selectedEmp.user?.email || "-"}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase">Nomor Telepon</span>
+                  <p className="font-bold text-slate-900 dark:text-white mt-0.5">{(selectedEmp as any).phone || "-"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase">Status Kepegawaian</span>
+                  <div className="mt-1">
+                    <AnimatedBadge variant={getStatusBadge(selectedEmp.status)}>
+                      {getStatusLabel(selectedEmp.status)}
+                    </AnimatedBadge>
+                  </div>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase">Gaji Pokok</span>
+                  <p className="font-extrabold text-teal-700 dark:text-teal-400 mt-0.5">
+                    {selectedEmp.salary ? formatCurrency(Number(selectedEmp.salary)) : "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+              <button
+                onClick={() => setSelectedEmp(null)}
+                className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+              >
+                Tutup Rincian
+              </button>
+              {canManage && (
+                <button
+                  onClick={() => {
+                    const target = selectedEmp;
+                    setSelectedEmp(null);
+                    handleOpenEditModal(target);
+                  }}
+                  className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 shadow-md"
+                >
+                  Edit Data Karyawan
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Employee Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
+                  Edit Profil & Data Kepegawaian
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Perbarui informasi posisi, departemen, telepon, gaji, dan status aktif.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditEmployee} className="mt-4 space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Nama Depan *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.firstName}
+                    onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Nama Belakang
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.lastName}
+                    onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Nomor HP / WhatsApp
+                </label>
+                <input
+                  type="text"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="081234567890"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Departemen *
+                  </label>
+                  <AutocompleteSelect
+                    options={[
+                      { value: "Human Resources", label: "Human Resources" },
+                      { value: "Engineering", label: "Engineering" },
+                      { value: "Marketing", label: "Marketing" },
+                      { value: "Finance", label: "Finance" },
+                      { value: "Operations", label: "Operations" },
+                    ]}
+                    value={editForm.department}
+                    onChange={(val) => setEditForm({ ...editForm, department: val })}
+                    placeholder="-- Pilih Departemen --"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Jabatan / Posisi *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.position}
+                    onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Status Karyawan *
+                  </label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                  >
+                    <option value="ACTIVE">ACTIVE (Aktif)</option>
+                    <option value="INACTIVE">INACTIVE (Non-Aktif)</option>
+                    <option value="ON_LEAVE">ON_LEAVE (Cuti)</option>
+                    <option value="TERMINATED">TERMINATED (Terminasi)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Gaji Pokok (Rp / Bulan) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={editForm.salary}
+                    onChange={(e) => setEditForm({ ...editForm, salary: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-teal-600/20 hover:from-teal-700 hover:to-teal-800 transition disabled:opacity-50"
+                >
+                  {submitting ? "Menyimpan..." : "Simpan Perubahan Data"}
                 </button>
               </div>
             </form>
