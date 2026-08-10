@@ -45,91 +45,170 @@ function addWatermark(doc: PDFKit.PDFDocument, text: string = "CONFIDENTIAL") {
 /**
  * Generate Payslip PDF
  */
+/**
+ * Generate Payslip PDF matching Indonesian corporate standard layout
+ */
 export async function generatePayslipPDF(payrollId: string): Promise<Buffer> {
   const payroll = await prisma.payroll.findUnique({
     where: { id: payrollId },
-    include: { employee: true },
+    include: {
+      employee: {
+        include: {
+          benefits: true,
+        },
+      },
+    },
   });
 
   if (!payroll) {
     throw new Error("Payroll not found");
   }
 
+  const globalCompany = await getCompanyInfo();
+  const emp = payroll.employee;
+  const periodMonthStr = new Date(payroll.year, payroll.month - 1).toLocaleDateString("id-ID", {
+    month: "long",
+    year: "numeric",
+  });
+
+  // Get Employee Salary & Bank info
+  const empSalary = await prisma.employeeSalary.findUnique({
+    where: { employeeId: emp.id },
+  });
+
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const doc = new PDFDocument({ size: "A4", margin: 40 });
     const chunks: Buffer[] = [];
 
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    addWatermark(doc, "SLIP GAJI");
-    createHeader(doc, "SLIP GAJI");
+    // 1. Company Header
+    doc.fontSize(16).font("Helvetica-Bold").text(globalCompany.name, { align: "center" });
+    doc.fontSize(9).font("Helvetica").text(globalCompany.address, { align: "center" });
+    doc.moveDown(0.8);
 
-    const emp = payroll.employee;
-    doc.fontSize(10).font("Helvetica-Bold").text("DATA KARYAWAN");
-    doc.font("Helvetica")
-      .text(`Nama: ${emp.firstName} ${emp.lastName}`)
-      .text(`NIK: ${emp.nik || "-"}`)
-      .text(`Departemen: ${emp.department}`)
-      .text(`Jabatan: ${emp.position}`)
-      .text(`Periode: ${new Date(payroll.year, payroll.month - 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" })}`);
+    doc.fontSize(11).font("Helvetica-Bold").text(`Slip Gaji Periode ${periodMonthStr}`, { align: "left" });
+    doc.moveDown(0.4);
 
-    doc.moveDown();
-    doc.fontSize(10).font("Helvetica-Bold").text("PENDAPATAN");
-    doc.moveDown(0.3);
+    // Horizontal Divider Line
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(0.8).strokeColor("#333333").stroke();
+    doc.moveDown(0.8);
 
-    const earnings = [
-      { label: "Gaji Pokok", amount: Number(payroll.baseSalary) },
-      { label: "Tunjangan", amount: Number(payroll.allowance) },
-      { label: "Bonus", amount: Number(payroll.bonus) },
-    ];
+    // 2. Employee Details Grid (2 Columns)
+    const leftColX = 40;
+    const rightColX = 310;
+    let gridY = doc.y;
 
-    earnings.forEach((item) => {
-      doc.font("Helvetica")
-        .text(item.label, 50, doc.y, { continued: true, width: 350 })
-        .text(`Rp ${item.amount.toLocaleString("id-ID")}`, { align: "right" });
+    const paidAtDate = payroll.paidAt
+      ? new Date(payroll.paidAt).toLocaleDateString("id-ID")
+      : new Date().toLocaleDateString("id-ID");
+
+    // Left Column Info
+    doc.font("Helvetica").fontSize(9);
+    doc.text("Nama", leftColX, gridY).text(`: ${emp.firstName} ${emp.lastName}`, leftColX + 80, gridY);
+    gridY += 14;
+    doc.text("Departemen", leftColX, gridY).text(`: ${emp.department}`, leftColX + 80, gridY);
+    gridY += 14;
+    doc.text("Jabatan", leftColX, gridY).text(`: ${emp.position}`, leftColX + 80, gridY);
+    gridY += 14;
+    doc.text("Tanggal Gajian", leftColX, gridY).text(`: ${paidAtDate}`, leftColX + 80, gridY);
+
+    // Right Column Info
+    let rightY = doc.y - 42;
+    const bpjsTkNum = emp.nik ? `ID/MB/${emp.nik.slice(-4)}` : "-";
+    const bpjsKesNum = emp.nik ? emp.nik.slice(0, 4) : "-";
+    const bankAccountStr = emp.bankAccount || empSalary?.bankAccount || "-";
+
+    doc.text("No. BPJS Ketenagakerjaan", rightColX, rightY).text(`: ${bpjsTkNum}`, rightColX + 130, rightY);
+    rightY += 14;
+    doc.text("No. BPJS Kesehatan", rightColX, rightY).text(`: ${bpjsKesNum}`, rightColX + 130, rightY);
+    rightY += 14;
+    doc.text("Hari Kerja", rightColX, rightY).text(": 22", rightColX + 130, rightY);
+    rightY += 14;
+    doc.text("Rekening Bank", rightColX, rightY).text(`: ${bankAccountStr}`, rightColX + 130, rightY);
+
+    doc.y = Math.max(gridY, rightY) + 12;
+
+    // Horizontal Divider Line
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(0.8).strokeColor("#333333").stroke();
+    doc.moveDown(0.8);
+
+    // 3. Two Column Table (Pendapatan vs Potongan)
+    const tableY = doc.y;
+    doc.font("Helvetica-Bold").fontSize(10).text("Pendapatan", leftColX, tableY);
+    doc.text("Potongan", rightColX, tableY);
+
+    let curEarningsY = tableY + 18;
+    let curDeductionsY = tableY + 18;
+
+    const baseSalaryNum = Number(payroll.baseSalary);
+    const allowanceNum = Number(payroll.allowance);
+    const overtimeNum = Number(payroll.overtime);
+    const bonusNum = Number(payroll.bonus) + Number(payroll.thr);
+
+    const earningsItems = [
+      { label: "Gaji Pokok", amount: baseSalaryNum },
+      { label: "Tunjangan Transportasi", amount: allowanceNum > 0 ? Math.round(allowanceNum * 0.6) : 0 },
+      { label: "Uang Makan", amount: allowanceNum > 0 ? Math.round(allowanceNum * 0.4) : 0 },
+      { label: "Insentif / Lembur", amount: overtimeNum + bonusNum },
+    ].filter((i) => i.amount >= 0);
+
+    earningsItems.forEach((item) => {
+      doc.font("Helvetica").fontSize(9);
+      doc.text(item.label, leftColX, curEarningsY);
+      doc.text(`: Rp${item.amount.toLocaleString("id-ID")}`, leftColX + 120, curEarningsY);
+      curEarningsY += 14;
     });
 
-    const totalEarnings = earnings.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0);
-    doc.moveTo(50, doc.y + 5).lineTo(545, doc.y + 5).stroke();
-    doc.font("Helvetica-Bold")
-      .text("Total Pendapatan", 50, doc.y + 10, { continued: true, width: 350 })
-      .text(`Rp ${totalEarnings.toLocaleString("id-ID")}`, { align: "right" });
+    const pph21Num = Number(payroll.pph21) || Number(payroll.tax);
+    const bpjsTkEmpNum = Number(payroll.bpjsJhtEmployee) + Number(payroll.bpjsJpEmployee);
+    const bpjsKesEmpNum = Number(payroll.bpjsKesehatanEmployee);
 
-    doc.moveDown();
-    doc.fontSize(10).font("Helvetica-Bold").text("POTONGAN");
-    doc.moveDown(0.3);
-
-    const deductions = [
-      { label: "BPJS Kesehatan", amount: Number(payroll.bpjsKesehatanEmployee) },
-      { label: "BPJS Ketenagakerjaan (JHT)", amount: Number(payroll.bpjsJhtEmployee) },
-      { label: "BPJS JP", amount: Number(payroll.bpjsJpEmployee) },
-      { label: "PPh 21", amount: Number(payroll.pph21) },
+    const deductionsItems = [
+      { label: "Pajak PPh 21", amount: pph21Num },
+      { label: "BPJS Ketenagakerjaan", amount: bpjsTkEmpNum },
+      { label: "BPJS Kesehatan", amount: bpjsKesEmpNum },
     ];
 
-    deductions.forEach((item) => {
-      doc.font("Helvetica")
-        .text(item.label, 50, doc.y, { continued: true, width: 350 })
-        .text(`Rp ${item.amount.toLocaleString("id-ID")}`, { align: "right" });
+    deductionsItems.forEach((item) => {
+      doc.font("Helvetica").fontSize(9);
+      doc.text(item.label, rightColX, curDeductionsY);
+      doc.text(`: Rp${item.amount.toLocaleString("id-ID")}`, rightColX + 130, curDeductionsY);
+      curDeductionsY += 14;
     });
 
-    const totalDeductions = deductions.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0);
-    doc.moveTo(50, doc.y + 5).lineTo(545, doc.y + 5).stroke();
-    doc.font("Helvetica-Bold")
-      .text("Total Potongan", 50, doc.y + 10, { continued: true, width: 350 })
-      .text(`Rp ${totalDeductions.toLocaleString("id-ID")}`, { align: "right" });
+    const maxY = Math.max(curEarningsY, curDeductionsY) + 10;
+    doc.y = maxY;
 
-    doc.moveDown();
-    doc.fontSize(12).font("Helvetica-Bold").fillColor("#0d9488");
-    doc.text("GAJI BERSIH", 50, doc.y, { continued: true, width: 350 })
-      .text(`Rp ${Number(payroll.netSalary).toLocaleString("id-ID")}`, { align: "right" });
-    doc.fillColor("black");
+    // Horizontal Divider Line
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(0.8).strokeColor("#333333").stroke();
+    doc.moveDown(0.8);
 
-    doc.moveDown(2);
-    doc.fontSize(8).font("Helvetica").fillColor("#666666");
-    doc.text("Dokumen ini digenerate otomatis oleh sistem SmartHRIS.", { align: "center" });
-    doc.text(`Dicetak pada: ${new Date().toLocaleString("id-ID")}`, { align: "center" });
+    // 4. Totals Breakdown
+    const totalEarningsNum = Number(payroll.grossIncome) || earningsItems.reduce((a, b) => a + b.amount, 0);
+    const totalDeductionsNum = Number(payroll.totalDeduction) || deductionsItems.reduce((a, b) => a + b.amount, 0);
+    const netSalaryNum = Number(payroll.netSalary);
+
+    let totalsY = doc.y;
+    doc.font("Helvetica-Bold").fontSize(9);
+    doc.text("Total Pendapatan", leftColX, totalsY);
+    doc.text(`:Rp${totalEarningsNum.toLocaleString("id-ID")}`, leftColX + 120, totalsY);
+
+    doc.text("Total Potongan", rightColX, totalsY);
+    doc.text(`: Rp${totalDeductionsNum.toLocaleString("id-ID")}`, rightColX + 130, totalsY);
+    totalsY += 18;
+
+    doc.text("Gaji Bersih", rightColX, totalsY);
+    doc.text(`: Rp${netSalaryNum.toLocaleString("id-ID")}`, rightColX + 130, totalsY);
+
+    // 5. Signature Block
+    doc.y = totalsY + 40;
+    const signY = doc.y;
+    doc.font("Helvetica").fontSize(9);
+    doc.text(`Jakarta, ${paidAtDate}`, 380, signY, { align: "right" });
+    doc.text("Manager", 380, signY + 30, { align: "right" });
 
     doc.end();
   });
