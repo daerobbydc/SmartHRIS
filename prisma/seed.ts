@@ -82,7 +82,7 @@ async function main() {
     },
   });
 
-  // Create employee user
+  // Create employee user (John Doe)
   const empPassword = await hash("employee123", 12);
   const empUser = await prisma.user.upsert({
     where: { email: "employee@smarthris.com" },
@@ -107,8 +107,96 @@ async function main() {
       position: "Software Developer",
       hireDate: new Date("2022-03-01"),
       salary: 12000000,
+      nik: "3171012345670003",
+      bankName: "BCA",
+      bankAccount: "1234567890",
+      bankBranch: "Sudirman",
+      ptkp: "TK/0",
     },
   });
+
+  // Create demo employee: Andi Pratama (PT Jati Retail Nusantara Payslip Demo)
+  const andiUser = await prisma.user.upsert({
+    where: { email: "andi.pratama@jatiretail.co.id" },
+    update: {},
+    create: {
+      email: "andi.pratama@jatiretail.co.id",
+      password: empPassword,
+      role: "EMPLOYEE",
+    },
+  });
+
+  const andiEmp = await prisma.employee.upsert({
+    where: { userId: andiUser.id },
+    update: {
+      firstName: "Andi",
+      lastName: "Pratama",
+      department: "Marketing",
+      position: "Inter Marketing",
+      salary: 1500000,
+      nik: "3171012345679021",
+      bankName: "BCA",
+      bankAccount: "99000",
+      bankBranch: "Jakarta",
+      ptkp: "TK/0",
+    },
+    create: {
+      userId: andiUser.id,
+      employeeId: "EMP-004",
+      firstName: "Andi",
+      lastName: "Pratama",
+      phone: "081299990000",
+      department: "Marketing",
+      position: "Inter Marketing",
+      hireDate: new Date("2025-01-10"),
+      salary: 1500000,
+      nik: "3171012345679021",
+      bankName: "BCA",
+      bankAccount: "99000",
+      bankBranch: "Jakarta",
+      ptkp: "TK/0",
+    },
+  });
+
+  // Create demo Payroll record for Andi Pratama (Periode Agustus 2025)
+  const existingPayroll = await prisma.payroll.findFirst({
+    where: {
+      employeeId: andiEmp.id,
+      month: 8,
+      year: 2025,
+    },
+  });
+
+  if (!existingPayroll) {
+    await prisma.payroll.create({
+      data: {
+        employeeId: andiEmp.id,
+        month: 8,
+        year: 2025,
+        baseSalary: 1500000,
+        allowance: 350000, // Transport (200.000) + Uang Makan (150.000)
+        overtime: 100000,  // Insentif Kehadiran
+        bonus: 0,
+        deduction: 0,
+        grossIncome: 1950000,
+        tax: 0,
+        pph21: 0,
+        bpjsKesehatanEmployee: 0,
+        bpjsKesehatanEmployer: 0,
+        bpjsJhtEmployee: 0,
+        bpjsJhtEmployer: 0,
+        bpjsJpEmployee: 0,
+        bpjsJpEmployer: 0,
+        bpjsJkk: 0,
+        bpjsJkm: 0,
+        totalDeduction: 0,
+        netSalary: 1950000,
+        status: "PAID",
+        paidAt: new Date("2025-08-27"),
+      },
+    });
+    console.log("Demo Payroll Andi Pratama Created");
+  }
 
   // Create default office locations
   const officeCount = await prisma.officeLocation.count();
