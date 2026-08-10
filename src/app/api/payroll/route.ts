@@ -45,12 +45,29 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Get employee salary data for auto-calculation
+    // Get employee & salary data for auto-calculation
+    const employee = await prisma.employee.findUnique({
+      where: { id: body.employeeId },
+    });
+
+    if (!employee) {
+      return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
+    }
+
     const salaryData = await prisma.employeeSalary.findUnique({
       where: { employeeId: body.employeeId },
     });
 
-    const baseSalary = parseFloat(body.baseSalary || salaryData?.baseSalary || 0);
+    const baseSalary = parseFloat(
+      body.baseSalary !== undefined && body.baseSalary !== ""
+        ? body.baseSalary
+        : salaryData?.baseSalary
+        ? salaryData.baseSalary.toString()
+        : employee.salary
+        ? employee.salary.toString()
+        : "5000000"
+    );
+
     const allowance = parseFloat(body.allowance || 0);
     const deduction = parseFloat(body.deduction || 0);
     const overtime = parseFloat(body.overtime || 0);
@@ -60,7 +77,7 @@ export async function POST(request: NextRequest) {
     const year = parseInt(body.year);
 
     // Auto-calculate PPh 21
-    const ptkpCode = salaryData?.ptkp || "TK/0";
+    const ptkpCode = salaryData?.ptkp || employee.ptkp || "TK/0";
     const isDecember = month === 12;
     let previousMonthsGross = 0;
 
@@ -82,36 +99,57 @@ export async function POST(request: NextRequest) {
     const totalDeduction = deduction + pph21Result.pph21 + bpjsTK.jhtEmployee + bpjsTK.jpEmployee + bpjsKes.employee;
     const netSalary = Math.max(0, grossIncome - totalDeduction);
 
-    const payroll = await prisma.payroll.create({
-      data: {
+    // Check if payroll record already exists for this employee, month, and year
+    const existing = await prisma.payroll.findFirst({
+      where: {
         employeeId: body.employeeId,
         month,
         year,
-        baseSalary,
-        allowance,
-        deduction,
-        tax: pph21Result.pph21,
-        overtime,
-        bonus,
-        thr,
-        // PPh 21
-        pph21: pph21Result.pph21,
-        pph21Type: pph21Result.pph21Type,
-        grossIncome,
-        // BPJS
-        bpjsJhtEmployee: bpjsTK.jhtEmployee,
-        bpjsJhtEmployer: bpjsTK.jhtEmployer,
-        bpjsJpEmployee: bpjsTK.jpEmployee,
-        bpjsJpEmployer: bpjsTK.jpEmployer,
-        bpjsJkk: bpjsTK.jkk,
-        bpjsJkm: bpjsTK.jkm,
-        bpjsKesehatanEmployee: bpjsKes.employee,
-        bpjsKesehatanEmployer: bpjsKes.employer,
-        // Net
-        totalDeduction,
-        netSalary,
       },
     });
+
+    const payrollData = {
+      employeeId: body.employeeId,
+      month,
+      year,
+      baseSalary,
+      allowance,
+      deduction,
+      tax: pph21Result.pph21,
+      overtime,
+      bonus,
+      thr,
+      // PPh 21
+      pph21: pph21Result.pph21,
+      pph21Type: pph21Result.pph21Type,
+      grossIncome,
+      // BPJS
+      bpjsJhtEmployee: bpjsTK.jhtEmployee,
+      bpjsJhtEmployer: bpjsTK.jhtEmployer,
+      bpjsJpEmployee: bpjsTK.jpEmployee,
+      bpjsJpEmployer: bpjsTK.jpEmployer,
+      bpjsJkk: bpjsTK.jkk,
+      bpjsJkm: bpjsTK.jkm,
+      bpjsKesehatanEmployee: bpjsKes.employee,
+      bpjsKesehatanEmployer: bpjsKes.employer,
+      // Net
+      totalDeduction,
+      netSalary,
+      status: "PAID" as const,
+      paidAt: new Date(),
+    };
+
+    let payroll;
+    if (existing) {
+      payroll = await prisma.payroll.update({
+        where: { id: existing.id },
+        data: payrollData,
+      });
+    } else {
+      payroll = await prisma.payroll.create({
+        data: payrollData,
+      });
+    }
     return NextResponse.json(payroll, { status: 201 });
   } catch (error) {
     console.error("Payroll POST error:", error);

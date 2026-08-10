@@ -22,17 +22,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
     }
 
-    // Get salary data
+    // Get salary data or fallback to Employee fields
     const salaryData = await prisma.employeeSalary.findUnique({
       where: { employeeId },
     });
 
-    if (!salaryData) {
-      return NextResponse.json({ error: "Data gaji karyawan tidak ditemukan" }, { status: 404 });
-    }
+    const baseSalary = parseFloat(
+      body.baseSalary !== undefined && body.baseSalary !== ""
+        ? body.baseSalary
+        : salaryData?.baseSalary
+        ? salaryData.baseSalary.toString()
+        : employee.salary
+        ? employee.salary.toString()
+        : "5000000"
+    );
 
-    const baseSalary = Number(salaryData.baseSalary);
-    const ptkpCode = salaryData.ptkp || "TK/0";
+    const ptkpCode = salaryData?.ptkp || employee.ptkp || "TK/0";
     const isDecember = month === 12;
 
     // Get previous months gross income for December calculation
