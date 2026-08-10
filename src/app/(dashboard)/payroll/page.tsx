@@ -169,10 +169,14 @@ export default function PayrollPage() {
     return matchSearch && matchDept;
   });
 
-  const totalNetSalary = filteredPayrolls.reduce((acc, p) => acc + p.netSalary, 0);
-  const totalPPh21 = filteredPayrolls.reduce((acc, p) => acc + (p.pph21 || p.tax || 0), 0);
+  const totalNetSalary = filteredPayrolls.reduce((acc, p) => acc + Number(p.netSalary || 0), 0);
+  const totalPPh21 = filteredPayrolls.reduce((acc, p) => acc + Number(p.pph21 || p.tax || 0), 0);
   const totalBPJS = filteredPayrolls.reduce(
-    (acc, p) => acc + (p.bpjsJhtEmployee || 0) + (p.bpjsJpEmployee || 0) + (p.bpjsKesehatanEmployee || 0),
+    (acc, p) =>
+      acc +
+      Number(p.bpjsJhtEmployee || 0) +
+      Number(p.bpjsJpEmployee || 0) +
+      Number(p.bpjsKesehatanEmployee || 0),
     0
   );
 
@@ -324,19 +328,23 @@ export default function PayrollPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 font-mono font-semibold text-slate-900 dark:text-white">
-                      {formatCurrency(payroll.baseSalary)}
+                      {formatCurrency(Number(payroll.baseSalary || 0))}
                     </td>
                     <td className="px-6 py-4 font-mono text-emerald-600 font-semibold">
-                      +{formatCurrency((payroll.allowance || 0) + (payroll.overtime || 0))}
+                      +{formatCurrency(Number(payroll.allowance || 0) + Number(payroll.overtime || 0))}
                     </td>
                     <td className="px-6 py-4 font-mono text-rose-600 font-semibold">
-                      -{formatCurrency(payroll.pph21 || payroll.tax || 0)}
+                      -{formatCurrency(Number(payroll.pph21 || payroll.tax || 0))}
                     </td>
                     <td className="px-6 py-4 font-mono text-cyan-600 font-semibold">
-                      -{formatCurrency((payroll.bpjsJhtEmployee || 0) + (payroll.bpjsJpEmployee || 0) + (payroll.bpjsKesehatanEmployee || 0))}
+                      -{formatCurrency(
+                        Number(payroll.bpjsJhtEmployee || 0) +
+                        Number(payroll.bpjsJpEmployee || 0) +
+                        Number(payroll.bpjsKesehatanEmployee || 0)
+                      )}
                     </td>
                     <td className="px-6 py-4 font-mono font-black text-slate-900 dark:text-white text-sm">
-                      {formatCurrency(payroll.netSalary)}
+                      {formatCurrency(Number(payroll.netSalary || 0))}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
