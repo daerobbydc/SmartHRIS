@@ -24,6 +24,12 @@ export default function NewEmployeePage() {
     department: "",
     position: "",
     salary: "",
+    nik: "",
+    bankName: "BCA",
+    bankAccount: "",
+    bankBranch: "",
+    npwp: "",
+    ptkp: "TK/0",
   });
 
   const handleChange = (
@@ -292,6 +298,110 @@ export default function NewEmployeePage() {
                 required
                 min="0"
               />
+            </div>
+          </div>
+        </AnimatedCard>
+
+        {/* Informasi Rekening Bank & Pajak */}
+        <AnimatedCard delay={0.4}>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+              <DollarSign className="h-5 w-5 text-blue-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900">Informasi Rekening Bank & Pajak</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                NIK KTP (16 Digit)
+              </label>
+              <input
+                type="text"
+                name="nik"
+                value={formData.nik}
+                onChange={handleChange}
+                placeholder="3171012345670001"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nama Bank Transfer
+              </label>
+              <select
+                name="bankName"
+                value={formData.bankName}
+                onChange={handleChange}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="BCA">BCA (Bank Central Asia)</option>
+                <option value="Mandiri">Bank Mandiri</option>
+                <option value="BNI">BNI (Bank Negara Indonesia)</option>
+                <option value="BRI">BRI (Bank Rakyat Indonesia)</option>
+                <option value="CIMB Niaga">CIMB Niaga</option>
+                <option value="Permata">Bank Permata</option>
+                <option value="Danamon">Bank Danamon</option>
+                <option value="BTN">BTN</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nomor Rekening Bank
+              </label>
+              <input
+                type="text"
+                name="bankAccount"
+                value={formData.bankAccount}
+                onChange={handleChange}
+                placeholder="1234567890"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cabang Bank
+              </label>
+              <input
+                type="text"
+                name="bankBranch"
+                value={formData.bankBranch}
+                onChange={handleChange}
+                placeholder="Cabang Sudirman Jakarta"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nomor NPWP Pajak
+              </label>
+              <input
+                type="text"
+                name="npwp"
+                value={formData.npwp}
+                onChange={handleChange}
+                placeholder="12.345.678.9-012.000"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status PTKP (PPh 21 TER)
+              </label>
+              <select
+                name="ptkp"
+                value={formData.ptkp}
+                onChange={handleChange}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="TK/0">TK/0 - Tidak Kawin / 0 Tanggungan</option>
+                <option value="TK/1">TK/1 - Tidak Kawin / 1 Tanggungan</option>
+                <option value="TK/2">TK/2 - Tidak Kawin / 2 Tanggungan</option>
+                <option value="TK/3">TK/3 - Tidak Kawin / 3 Tanggungan</option>
+                <option value="K/0">K/0 - Kawin / 0 Tanggungan</option>
+                <option value="K/1">K/1 - Kawin / 1 Tanggungan</option>
+                <option value="K/2">K/2 - Kawin / 2 Tanggungan</option>
+                <option value="K/3">K/3 - Kawin / 3 Tanggungan</option>
+              </select>
             </div>
           </div>
         </AnimatedCard>

@@ -73,6 +73,12 @@ export default function EmployeesPage() {
     position: "Software Engineer",
     salary: "8000000",
     status: "ACTIVE",
+    nik: "",
+    bankName: "BCA",
+    bankAccount: "",
+    bankBranch: "",
+    npwp: "",
+    ptkp: "TK/0",
   });
 
   const handleOpenEditModal = (emp: Employee) => {
@@ -85,6 +91,12 @@ export default function EmployeesPage() {
       position: emp.position || "Staff",
       salary: emp.salary ? emp.salary.toString() : "8000000",
       status: emp.status || "ACTIVE",
+      nik: (emp as any).nik || "",
+      bankName: (emp as any).bankName || "BCA",
+      bankAccount: (emp as any).bankAccount || "",
+      bankBranch: (emp as any).bankBranch || "",
+      npwp: (emp as any).npwp || "",
+      ptkp: (emp as any).ptkp || "TK/0",
     });
     setShowEditModal(true);
   };
@@ -808,6 +820,107 @@ export default function EmployeesPage() {
                     onChange={(e) => setEditForm({ ...editForm, salary: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold"
                   />
+                </div>
+              </div>
+
+              {/* Informasi Rekening Bank & Pajak */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <p className="font-extrabold text-teal-700 dark:text-teal-400">
+                  Informasi Rekening Bank & Pajak
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      NIK KTP (16 Digit)
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.nik}
+                      onChange={(e) => setEditForm({ ...editForm, nik: e.target.value })}
+                      placeholder="3171012345670001"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Nama Bank Transfer
+                    </label>
+                    <select
+                      value={editForm.bankName}
+                      onChange={(e) => setEditForm({ ...editForm, bankName: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    >
+                      <option value="BCA">BCA (Bank Central Asia)</option>
+                      <option value="Mandiri">Bank Mandiri</option>
+                      <option value="BNI">BNI (Bank Negara Indonesia)</option>
+                      <option value="BRI">BRI (Bank Rakyat Indonesia)</option>
+                      <option value="CIMB Niaga">CIMB Niaga</option>
+                      <option value="Permata">Bank Permata</option>
+                      <option value="Danamon">Bank Danamon</option>
+                      <option value="BTN">BTN</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Nomor Rekening Bank
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.bankAccount}
+                      onChange={(e) => setEditForm({ ...editForm, bankAccount: e.target.value })}
+                      placeholder="1234567890"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Cabang Bank
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.bankBranch}
+                      onChange={(e) => setEditForm({ ...editForm, bankBranch: e.target.value })}
+                      placeholder="Cabang Sudirman"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Nomor NPWP Pajak
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.npwp}
+                      onChange={(e) => setEditForm({ ...editForm, npwp: e.target.value })}
+                      placeholder="12.345.678.9-012.000"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Status PTKP (PPh 21 TER)
+                    </label>
+                    <select
+                      value={editForm.ptkp}
+                      onChange={(e) => setEditForm({ ...editForm, ptkp: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-900 focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    >
+                      <option value="TK/0">TK/0 - Tidak Kawin / 0 Tanggungan</option>
+                      <option value="TK/1">TK/1 - Tidak Kawin / 1 Tanggungan</option>
+                      <option value="TK/2">TK/2 - Tidak Kawin / 2 Tanggungan</option>
+                      <option value="TK/3">TK/3 - Tidak Kawin / 3 Tanggungan</option>
+                      <option value="K/0">K/0 - Kawin / 0 Tanggungan</option>
+                      <option value="K/1">K/1 - Kawin / 1 Tanggungan</option>
+                      <option value="K/2">K/2 - Kawin / 2 Tanggungan</option>
+                      <option value="K/3">K/3 - Kawin / 3 Tanggungan</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 

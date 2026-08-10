@@ -109,6 +109,12 @@ export async function POST(request: NextRequest) {
       department,
       position,
       salary,
+      nik,
+      bankName,
+      bankAccount,
+      bankBranch,
+      npwp,
+      ptkp,
     } = body;
 
     // Check if email already exists
@@ -159,6 +165,12 @@ export async function POST(request: NextRequest) {
         position,
         hireDate: new Date(),
         salary: salary ? parseFloat(salary) : 5000000,
+        nik: nik || null,
+        bankName: bankName || null,
+        bankAccount: bankAccount || null,
+        bankBranch: bankBranch || null,
+        npwp: npwp || null,
+        ptkp: ptkp || "TK/0",
       },
       include: {
         user: {
@@ -217,7 +229,22 @@ export async function PUT(request: NextRequest) {
     }
 
     // HR / ADMIN can update all fields
-    const { firstName, lastName, phone, address, department, position, salary, status } = body;
+    const {
+      firstName,
+      lastName,
+      phone,
+      address,
+      department,
+      position,
+      salary,
+      status,
+      nik,
+      bankName,
+      bankAccount,
+      bankBranch,
+      npwp,
+      ptkp,
+    } = body;
 
     const updated = await prisma.employee.update({
       where: { id },
@@ -230,6 +257,12 @@ export async function PUT(request: NextRequest) {
         position: position !== undefined ? position : undefined,
         salary: salary !== undefined ? parseFloat(salary) : undefined,
         status: status !== undefined ? status : undefined,
+        nik: nik !== undefined ? nik : undefined,
+        bankName: bankName !== undefined ? bankName : undefined,
+        bankAccount: bankAccount !== undefined ? bankAccount : undefined,
+        bankBranch: bankBranch !== undefined ? bankBranch : undefined,
+        npwp: npwp !== undefined ? npwp : undefined,
+        ptkp: ptkp !== undefined ? ptkp : undefined,
       },
     });
 
