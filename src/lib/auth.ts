@@ -64,6 +64,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return session;
     },
+    async redirect({ url }) {
+      if (url.startsWith("/")) return url;
+      try {
+        const parsed = new URL(url);
+        return parsed.pathname;
+      } catch {
+        return "/login";
+      }
+    },
   },
   pages: {
     signIn: "/login",
