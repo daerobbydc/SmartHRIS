@@ -15,26 +15,65 @@ export interface AIScreeningResult {
 }
 
 /**
- * Extended Indonesian & English skill dictionary for HRIS recruitment matching
+ * Comprehensive Indonesian & English skill & occupation dictionary for HRIS matching
  */
 const COMMON_SKILLS = [
-  // Tech & Engineering
-  "react", "next.js", "typescript", "javascript", "node.js", "express", "tailwind",
-  "postgresql", "mysql", "mongodb", "prisma", "docker", "aws", "git", "rest api",
-  "php", "laravel", "python", "java", "figma", "ui/ux", "scrum", "agile", "web development",
-  // Marketing & Creative
-  "marketing", "pemasaran", "social media", "sosial media", "content creator", "copywriting",
-  "seo", "sem", "digital marketing", "graphic design", "desain grafis", "photoshop", "illustrator",
-  "video editing", "canva", "branding", "public relations", "humas", "iklan", "promosi",
-  // Administration & HR & Finance
-  "administrasi", "administration", "excel", "ms office", "microsoft office", "word",
-  "powerpoint", "accounting", "akuntansi", "keuangan", "finance", "taxation", "pajak", "pph21",
-  "bpjs", "hris", "payroll", "penggajian", "recruitment", "rekrutmen", "human resources",
-  // Sales & Operations & Soft Skills
-  "sales", "penjualan", "business development", "customer service", "negosiasi", "negotiation",
-  "communication", "komunikasi", "leadership", "kepemimpinan", "project management",
-  "manajemen proyek", "time management", "problem solving", "english", "bahasa inggris",
-  "analisis data", "data analysis", "kerja tim", "teamwork", "operasional", "retail", "magang", "internship"
+  // === 1. TEKNOLOGI INFORMASI & SOFTWARE ENGINEERING ===
+  "react", "next.js", "vue.js", "angular", "typescript", "javascript", "node.js", "express", "nest.js",
+  "tailwind", "bootstrap", "html", "css", "flutter", "react native", "android", "ios", "swift", "kotlin",
+  "golang", "php", "laravel", "codeigniter", "python", "django", "fastapi", "java", "spring boot",
+  "c#", ".net", "postgresql", "mysql", "mongodb", "sqlite", "redis", "prisma", "docker", "kubernetes",
+  "aws", "google cloud", "azure", "git", "github", "gitlab", "ci/cd", "rest api", "graphql", "microservices",
+  "devops", "cybersecurity", "sysadmin", "network engineer", "qa engineer", "software tester",
+  "ui/ux", "figma", "adobe xd", "scrum", "agile", "web development", "backend", "frontend", "fullstack",
+
+  // === 2. PEMASARAN, DIGITAL MARKETING, SOSMED & KREATIF ===
+  "digital marketing", "pemasaran digital", "pemasaran", "social media specialist", "social media", "sosial media",
+  "instagram", "tiktok", "facebook ads", "google ads", "meta ads", "content creator", "content planner",
+  "copywriting", "copywriter", "content writing", "seo", "sem", "keyword research", "google analytics",
+  "graphic design", "desain grafis", "photoshop", "illustrator", "canva", "coreldraw", "video editing",
+  "premiere pro", "after effects", "capcut", "videografer", "videographer", "fotografer", "photographer",
+  "branding", "brand awareness", "public relations", "humas", "hubungan masyarakat", "event organizer",
+  "influencer marketing", "kol management", "email marketing", "iklan", "promosi",
+
+  // === 3. KEUANGAN, AKUNTANSI, PAJAK & PERBANKAN ===
+  "accounting", "akuntansi", "keuangan", "finance", "pembukuan", "bookkeeping", "laporan keuangan",
+  "financial statement", "jurnal umum", "general ledger", "pajak", "taxation", "tax", "pph21", "pph23",
+  "pph25", "ppn", "efaktur", "ebupot", "spt", "brevet a", "brevet b", "zahir", "accurate", "myob", "sap",
+  "excel", "microsoft excel", "vlookup", "pivot table", "auditing", "internal audit", "cash flow",
+  "rekon bank", "bank reconciliation", "piutang", "utang", "account payable", "account receivable",
+  "perbankan", "teller", "customer service bank",
+
+  // === 4. SUMBER DAYA MANUSIA, HRD, PERSONALIA & LEGAL ===
+  "human resources", "hrd", "hr generalist", "hr manager", "hr staff", "recruitment", "rekrutmen",
+  "talent acquisition", "sourcing", "interview", "wawancara", "psikotes", "payroll", "penggajian", "gaji",
+  "bpjs ketenagakerjaan", "bpjs kesehatan", "hris", "personalia", "general affair", "ga", "hubungan industrial",
+  "industrial relations", "uu ketenagakerjaan", "pkwt", "pkwtt", "sop", "key performance indicator", "kpi",
+  "perjanjian kerja", "legal", "penyusunan kontrak", "hukum perusahaan", "corporate legal",
+
+  // === 5. PENJUALAN, BISNIS, CUSTOMER SERVICE & RETAIL ===
+  "sales", "penjualan", "sales executive", "sales manager", "account executive", "business development", "bd",
+  "pengembangan bisnis", "kanvasing", "telemarketing", "telesales", "customer service", "layanan pelanggan",
+  "crm", "hubspot", "salesforce", "negosiasi", "negotiation", "presentasi", "pitching", "retensi pelanggan",
+  "retail", "kasir", "spg", "spb", "store manager", "merchandiser",
+
+  // === 6. OPERASIONAL, LOGISTIK, GUDANG & MANUFAKTUR ===
+  "operasional", "operations", "logistik", "logistics", "gudang", "warehouse", "inventaris", "inventory",
+  "stock opname", "supply chain", "rantai pasok", "pengiriman", "freight forwarding", "driver", "kurir",
+  "fleet management", "manufaktur", "produksi", "quality control", "qc", "quality assurance", "qa",
+  "k3", "keselamatan kerja", "iso 9001", "5s", "kaizen", "lean manufacturing",
+
+  // === 7. ADMINISTRASI, UMUM & SEKRETARIS ===
+  "administrasi", "administration", "admin toko", "admin sosmed", "admin gudang", "admin penjualan",
+  "ms office", "microsoft office", "word", "powerpoint", "google docs", "google sheets", "input data",
+  "data entry", "sekretaris", "secretary", "korespondensi", "pengarsipan", "filing", "notulensi",
+  "receptionist", "resepsionis",
+
+  // === 8. BAHASA, SOFT SKILLS & KUALIFIKASI KUNCI ===
+  "komunikasi", "communication", "kepemimpinan", "leadership", "kerja tim", "teamwork", "manajemen waktu",
+  "time management", "problem solving", "pemecahan masalah", "berpikir kritis", "critical thinking",
+  "adaptabilitas", "adaptability", "kreativitas", "creativity", "bahasa indonesia", "bahasa inggris",
+  "english", "mandarin", "jepang", "d3", "s1", "s2", "sma", "smk", "sarjana", "diploma", "magang", "internship"
 ];
 
 const STOP_WORDS = new Set([
@@ -44,7 +83,8 @@ const STOP_WORDS = new Set([
   "minimal", "pendidikan", "pengalaman", "posisi", "tugas", "tahun", "tingkat", "tentang",
   "bisa", "secara", "serta", "with", "from", "that", "this", "have", "will", "your",
   "their", "about", "must", "they", "them", "some", "more", "such", "than", "then",
-  "hingga", "kuota", "terpenuhi", "staf", "staff", "dibutuhkan", "persyaratan"
+  "hingga", "kuota", "terpenuhi", "staf", "staff", "dibutuhkan", "persyaratan", "persyaratan:",
+  "kualifikasi", "deskripsi", "tanggung", "jawab", "job", "description"
 ]);
 
 /**
