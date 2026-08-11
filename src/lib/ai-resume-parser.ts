@@ -176,43 +176,44 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
     }
   });
 
-  // Calculate base score
-  let baseScore = 50;
-
-  // 1. Skill Match Ratio (40 pts)
+  // === RE-BALANCED SCORING MODEL (Skill Match DOMINANT 70%) ===
+  // 1. Skill Match Ratio (70 Poin Dominan Utama)
   const totalReqs = Math.max(1, matchedSkills.length + missingSkills.length);
   const skillRatio = matchedSkills.length / totalReqs;
-  baseScore += Math.round(skillRatio * 40);
+  const skillScore = Math.round(skillRatio * 70);
 
-  // 2. Cover Letter Presence & Quality (15 pts)
-  if (applicant.coverLetter && applicant.coverLetter.length > 100) {
-    baseScore += 15;
-  } else if (applicant.coverLetter) {
-    baseScore += 8;
-  }
-
-  // 3. Google Drive CV Link presence & content scan (15 pts)
-  if (applicant.cvUrl && applicant.cvUrl.includes("drive.google.com")) {
-    baseScore += 10;
+  // 2. Google Drive CV Link & Extracted Content Scan (15 Poin)
+  let cvScore = 0;
+  if (applicant.cvUrl && (applicant.cvUrl.includes("drive.google.com") || applicant.cvUrl.includes("docs.google.com"))) {
+    cvScore = 10;
     if (driveCvText.length > 100) {
-      baseScore += 5; // Bonus score for successfully extracted CV text from Google Drive
+      cvScore += 5; // Bonus for successfully extracted CV text
     }
   } else if (applicant.cvUrl) {
-    baseScore += 8;
+    cvScore = 8;
   }
 
-  // 4. Contact completeness (5 pts)
-  if (applicant.phone && applicant.email) {
-    baseScore += 5;
+  // 3. Cover Letter Quality & Depth (10 Poin)
+  let letterScore = 0;
+  if (applicant.coverLetter && applicant.coverLetter.length > 150) {
+    letterScore = 10;
+  } else if (applicant.coverLetter) {
+    letterScore = 5;
   }
 
-  // 5. Source & Blacklist check
+  // 4. Contact Completeness (5 Poin)
+  const contactScore = (applicant.phone && applicant.email) ? 5 : 2;
+
+  // Calculate Total Match Score
+  let totalScore = skillScore + cvScore + letterScore + contactScore;
+
+  // Blacklist Protection
   if (applicant.isBlacklisted) {
-    baseScore = 0;
+    totalScore = 0;
   }
 
   // Cap score between 0 and 100
-  const matchScore = Math.min(100, Math.max(0, baseScore));
+  const matchScore = Math.min(100, Math.max(0, totalScore));
 
   // Determine grade & recommendation
   let grade: AIScreeningResult["grade"] = "CUKUP";
@@ -242,12 +243,11 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   const strengths: string[] = [];
   const areasOfConcern: string[] = [];
 
-  if (applicant.cvUrl && applicant.cvUrl.includes("drive.google.com")) {
-    strengths.push("Melampirkan Link CV Google Drive resmi yang telah dianalisis AI");
-  }
-
   if (matchedSkills.length > 0) {
-    strengths.push(`Memiliki keahlian/kualifikasi terdeteksi: ${matchedSkills.slice(0, 5).join(", ")}`);
+    strengths.push(`Keahlian cocok (${matchedSkills.length}/${totalReqs}): ${matchedSkills.slice(0, 5).join(", ")}`);
+  }
+  if (applicant.cvUrl && applicant.cvUrl.includes("drive.google.com")) {
+    strengths.push("Melampirkan berkas CV Google Drive resmi yang berhasil diurai AI");
   }
   if (applicant.coverLetter && applicant.coverLetter.length > 150) {
     strengths.push("Surat lamaran terstruktur dengan penjelasan kualifikasi yang jelas");
@@ -257,7 +257,7 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   }
 
   if (missingSkills.length > 0) {
-    areasOfConcern.push(`Keahlian/persyaratan belum terdeteksi secara eksplisit: ${missingSkills.slice(0, 5).join(", ")}`);
+    areasOfConcern.push(`Keahlian belum terdeteksi (${missingSkills.length}/${totalReqs}): ${missingSkills.slice(0, 5).join(", ")}`);
   }
   if (!applicant.coverLetter) {
     areasOfConcern.push("Tidak melampirkan Surat Lamaran / Cover Letter");
@@ -270,7 +270,7 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   const summary = applicant.isBlacklisted
     ? `Kandidat ${applicant.name} dalam status Blacklist. Tidak direkomendasikan untuk diproses.`
     : `Kandidat ${applicant.name} memperoleh skor AI Match ${matchScore}% untuk posisi ${vacancy.title}. ` +
-      `AI memindai kualifikasi, menemukan ${matchedSkills.length} keahlian yang sesuai dari total ${totalReqs} persyaratan posisi. ` +
+      `AI memindai kualifikasi dengan bobot dominan 70% Skill Match, menemukan ${matchedSkills.length} keahlian sesuai dari total ${totalReqs} persyaratan posisi. ` +
       `Rekomendasi tindakan: ${recommendation.replace(/_/g, " ")}.`;
 
   const screeningResult: AIScreeningResult = {
