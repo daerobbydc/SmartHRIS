@@ -1,4 +1,13 @@
 // Export utilities untuk bank transfer dan e-SPT PPh 21
+import {
+  generateBCACSV as genBCACSV,
+  generateMandiriCSV as genMandiriCSV,
+  generateBNICSV as genBNICSV,
+  generateBRICSV as genBRICSV,
+  generateBSICSV as genBSICSV,
+  generateStandardCSV as genStandardCSV,
+  BankTransferData,
+} from "./bank-integration";
 
 export interface PayrollExportData {
   employeeId: string;
@@ -13,129 +22,55 @@ export interface PayrollExportData {
   pph21: number;
   month: number;
   year: number;
+  email?: string;
+}
+
+// Helper to convert PayrollExportData to BankTransferData
+function convertToBankTransferData(data: PayrollExportData[]): BankTransferData[] {
+  return data.map((d) => ({
+    employeeId: d.employeeId,
+    employeeName: `${d.firstName} ${d.lastName}`.trim(),
+    bankCode: d.bankName || "BCA",
+    bankName: d.bankName || "BCA",
+    bankBranch: d.bankBranch,
+    accountNumber: d.bankAccount || "",
+    amount: d.netSalary,
+    reference: `GAJI-${d.year}${d.month.toString().padStart(2, "0")}-${d.employeeId}`,
+    description: `Gaji ${getMonthName(d.month)} ${d.year}`,
+    email: d.email,
+    hasValidAccount: Boolean(d.bankAccount && d.bankAccount.trim().length >= 4),
+  }));
 }
 
 // ==================== BANK EXPORT ====================
 
-/**
- * Generate BCA KlikBCA Bisnis CSV format
- */
 export function generateBCACSV(data: PayrollExportData[], month: number, year: number): string {
-  const header = [
-    "No",
-    "Rekening Tujuan",
-    "Nama Penerima",
-    "Jumlah Transfer",
-    "Keterangan",
-  ].join(";");
-
-  const rows = data.map((d, i) => [
-    i + 1,
-    d.bankAccount || "",
-    `${d.firstName} ${d.lastName}`,
-    d.netSalary.toFixed(2).replace(".", ","),
-    `Gaji ${getMonthName(month)} ${year}`,
-  ].join(";"));
-
-  return [header, ...rows].join("\n");
+  return genBCACSV(convertToBankTransferData(data));
 }
 
-/**
- * Generate Mandiri MCM CSV format
- */
 export function generateMandiriMCMCSV(data: PayrollExportData[], month: number, year: number): string {
-  // Mandiri MCM format: Rekening Asal;Rekening Tujuan;Nama Penerima;Jumlah;Keterangan;Email
-  const header = [
-    "Rekening Asal",
-    "Rekening Tujuan",
-    "Nama Penerima",
-    "Jumlah Transfer",
-    "Keterangan",
-    "Email Penerima",
-  ].join(";");
-
-  const rows = data.map((d) => [
-    "", // Rekening asal (diisi manual atau dari config)
-    d.bankAccount || "",
-    `${d.firstName} ${d.lastName}`,
-    d.netSalary.toFixed(2),
-    `Gaji ${getMonthName(month)} ${year}`,
-    "", // Email optional
-  ].join(";"));
-
-  return [header, ...rows].join("\n");
+  return genMandiriCSV(convertToBankTransferData(data));
 }
 
-/**
- * Generate BNI CSV format
- */
 export function generateBNICSV(data: PayrollExportData[], month: number, year: number): string {
-  // BNI format
-  const header = [
-    "No Rekening",
-    "Nama Penerima",
-    "Nominal",
-    "Keterangan",
-  ].join(";");
-
-  const rows = data.map((d, i) => [
-    d.bankAccount || "",
-    `${d.firstName} ${d.lastName}`,
-    d.netSalary.toFixed(2),
-    `Gaji${getMonthName(month)}${year}`,
-  ].join(";"));
-
-  return [header, ...rows].join("\n");
+  return genBNICSV(convertToBankTransferData(data));
 }
 
-/**
- * Generate BRI CSV format (BRIVA)
- */
 export function generateBRICSV(data: PayrollExportData[], month: number, year: number): string {
-  // BRI BRIVA format
-  const header = [
-    "Kode Bayar",
-    "Jumlah",
-    "Keterangan",
-  ].join(";");
-
-  const rows = data.map((d) => [
-    d.bankAccount || "",
-    d.netSalary.toFixed(2),
-    `GAJI ${getMonthName(month)} ${year}`,
-  ].join(";"));
-
-  return [header, ...rows].join("\n");
+  return genBRICSV(convertToBankTransferData(data));
 }
 
-/**
- * Generate generic bank transfer CSV
- */
+export function generateBSICSV(data: PayrollExportData[], month: number, year: number): string {
+  return genBSICSV(convertToBankTransferData(data));
+}
+
 export function generateGenericBankCSV(
   data: PayrollExportData[],
   month: number,
   year: number,
   bankName: string
 ): string {
-  const header = [
-    "No",
-    "Rekening Tujuan",
-    "Nama Penerima",
-    "Jumlah Transfer",
-    "Keterangan",
-    "Bank",
-  ].join(";");
-
-  const rows = data.map((d, i) => [
-    i + 1,
-    d.bankAccount || "-",
-    `${d.firstName} ${d.lastName}`,
-    d.netSalary.toFixed(0),
-    `Gaji ${getMonthName(month)} ${year}`,
-    bankName,
-  ].join(";"));
-
-  return [header, ...rows].join("\n");
+  return genStandardCSV(convertToBankTransferData(data));
 }
 
 // ==================== e-SPT PPh 21 ====================
@@ -145,7 +80,6 @@ export function generateGenericBankCSV(
  * Format sesuai format Direktorat Jenderal Pajak
  */
 export function generateESPT21CSV(data: PayrollExportData[], month: number, year: number): string {
-  // Header e-SPT 21-1
   const header = [
     "NPWP",
     "Nama",
@@ -166,7 +100,6 @@ export function generateESPT21CSV(data: PayrollExportData[], month: number, year
     "1",
   ].join(";"));
 
-  // Footer
   const totalBruto = data.reduce((sum, d) => sum + d.netSalary + d.pph21, 0);
   const totalPPh21 = data.reduce((sum, d) => sum + d.pph21, 0);
 
@@ -204,11 +137,11 @@ export function generateESPT21JSON(data: PayrollExportData[], month: number, yea
       nomorBuktiPotong: `21-${year}${month.toString().padStart(2, "0")}-${(i + 1).toString().padStart(4, "0")}`,
       npwp: d.npwp || "",
       nama: `${d.firstName} ${d.lastName}`,
-      jenisPekerjaan: "1", // Pegawai Tetap
+      jenisPekerjaan: "1",
       jumlahPenghasilanBruto: d.netSalary + d.pph21,
       jumlahPenghasilanKenaPajak: d.netSalary,
       jumlahPPh21: d.pph21,
-      status: "1", // Pegawai Tetap
+      status: "1",
     })),
     rekapitulasi: {
       jumlahBuktiPotong: data.length,
@@ -233,13 +166,15 @@ function getMonthName(month: number): string {
  */
 export function getBankList() {
   return [
+    { code: "ALL", name: "Semua Bank", format: "CSV" },
     { code: "BCA", name: "Bank Central Asia", format: "KlikBCA" },
-    { code: "MANDIRI", name: "Bank Mandiri", format: "MCM" },
-    { code: "BNI", name: "Bank Negara Indonesia", format: "BNI" },
-    { code: "BRI", name: "Bank Rakyat Indonesia", format: "BRIVA" },
-    { code: "BTN", name: "Bank Tabungan Negara", format: "CSV" },
+    { code: "MANDIRI", name: "Bank Mandiri", format: "MCM 2.0" },
+    { code: "BNI", name: "Bank Negara Indonesia", format: "BNI Direct" },
+    { code: "BRI", name: "Bank Rakyat Indonesia", format: "BRIVA / CMS" },
+    { code: "BSI", name: "Bank Syariah Indonesia", format: "CMS BSI" },
+    { code: "CIMB", name: "Bank CIMB Niaga", format: "BizChannel" },
+    { code: "PERMATA", name: "Bank Permata", format: "e-Business" },
+    { code: "BTN", name: "Bank Tabungan Negara", format: "CMS BTN" },
     { code: "DANAMON", name: "Bank Danamon", format: "CSV" },
-    { code: "CIMB", name: "Bank CIMB Niaga", format: "CSV" },
-    { code: "PERMATA", name: "Bank Permata", format: "CSV" },
   ];
 }

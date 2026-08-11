@@ -18,6 +18,7 @@ import {
   Plus,
   Building2,
   Sparkles,
+  CreditCard,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
@@ -162,6 +163,29 @@ export default function PayrollPage() {
     }
   };
 
+  const handleDownloadBankTransfer = async (bank = "ALL") => {
+    try {
+      const res = await fetch(`/api/integrations/bank?month=${selectedMonth}&year=${selectedYear}&bank=${bank}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Gagal mengunduh file transfer bank");
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `transfer-${bank.toLowerCase()}-${selectedMonth}-${selectedYear}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Bank export error:", error);
+      alert("Terjadi kesalahan saat mengunduh file Bank Auto-Upload");
+    }
+  };
+
   const filteredPayrolls = payrolls.filter((p) => {
     const fullName = `${p.employee.firstName} ${p.employee.lastName}`.toLowerCase();
     const matchSearch = fullName.includes(search.toLowerCase()) || p.employee.employeeId.toLowerCase().includes(search.toLowerCase());
@@ -203,7 +227,14 @@ export default function PayrollPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => handleDownloadBankTransfer("ALL")}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3.5 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-xs"
+            title="Download file Auto-Upload Bank Transfer"
+          >
+            <CreditCard className="h-4 w-4" /> Bank Auto-Upload
+          </button>
           <a
             href="/payroll/components"
             className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 transition"

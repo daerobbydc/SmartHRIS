@@ -5,6 +5,7 @@ import {
   generateMandiriMCMCSV,
   generateBNICSV,
   generateBRICSV,
+  generateBSICSV,
   generateGenericBankCSV,
   generateESPT21CSV,
   generateESPT21JSON,
@@ -20,9 +21,9 @@ export async function GET(request: NextRequest) {
     const format = searchParams.get("format") || "csv"; // csv or json
     const type = searchParams.get("type") || "bank"; // bank or espt
 
-    // Get payroll data with employee info
+    // Get payroll data with employee info (support PAID, PROCESSED, PENDING)
     const payrolls = await prisma.payroll.findMany({
-      where: { month, year, status: "PAID" },
+      where: { month, year, status: { in: ["PAID", "PROCESSED", "PENDING"] } },
       include: {
         employee: {
           include: {
@@ -47,14 +48,15 @@ export async function GET(request: NextRequest) {
         firstName: p.employee.firstName,
         lastName: p.employee.lastName,
         department: p.employee.department,
-        bankName: salary?.bankName || undefined,
-        bankAccount: salary?.bankAccount || undefined,
-        bankBranch: salary?.bankBranch || undefined,
-        npwp: salary?.npwp || undefined,
+        bankName: p.employee.bankName || salary?.bankName || undefined,
+        bankAccount: p.employee.bankAccount || salary?.bankAccount || undefined,
+        bankBranch: p.employee.bankBranch || salary?.bankBranch || undefined,
+        npwp: p.employee.npwp || salary?.npwp || undefined,
         netSalary: Number(p.netSalary),
-        pph21: Number(p.tax),
+        pph21: Number(p.tax || p.pph21),
         month: p.month,
         year: p.year,
+        email: p.employee.user?.email,
       };
     });
 
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
     }
 
     let content: string;
-    let contentType = "text/csv";
+    let contentType = "text/csv;charset=utf-8;";
     let filename: string;
 
     if (type === "espt") {
@@ -78,7 +80,8 @@ export async function GET(request: NextRequest) {
       filename = `eSPT-PPh21-${year}${month.toString().padStart(2, "0")}.csv`;
     } else {
       // Bank export
-      switch (bank.toUpperCase()) {
+      const bankCode = bank.toUpperCase();
+      switch (bankCode) {
         case "MANDIRI":
           content = generateMandiriMCMCSV(exportData, month, year);
           filename = `Mandiri-MCM-${year}${month.toString().padStart(2, "0")}.csv`;
@@ -91,10 +94,17 @@ export async function GET(request: NextRequest) {
           content = generateBRICSV(exportData, month, year);
           filename = `BRI-BRIVA-${year}${month.toString().padStart(2, "0")}.csv`;
           break;
+        case "BSI":
+          content = generateBSICSV(exportData, month, year);
+          filename = `BSI-CMS-${year}${month.toString().padStart(2, "0")}.csv`;
+          break;
         case "BCA":
-        default:
           content = generateBCACSV(exportData, month, year);
           filename = `BCA-KlikBCA-${year}${month.toString().padStart(2, "0")}.csv`;
+          break;
+        default:
+          content = generateGenericBankCSV(exportData, month, year, bankCode);
+          filename = `Bank-${bankCode}-${year}${month.toString().padStart(2, "0")}.csv`;
           break;
       }
     }
