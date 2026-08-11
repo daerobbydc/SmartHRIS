@@ -15,16 +15,37 @@ export interface AIScreeningResult {
 }
 
 /**
- * Common skill dictionary for HRIS recruitment matching
+ * Extended Indonesian & English skill dictionary for HRIS recruitment matching
  */
 const COMMON_SKILLS = [
+  // Tech & Engineering
   "react", "next.js", "typescript", "javascript", "node.js", "express", "tailwind",
   "postgresql", "mysql", "mongodb", "prisma", "docker", "aws", "git", "rest api",
-  "php", "laravel", "python", "java", "figma", "ui/ux", "scrum", "agile",
-  "excel", "financial analysis", "accounting", "taxation", "pph21", "bpjs",
-  "hris", "payroll", "recruitment", "public speaking", "communication", "leadership",
-  "project management", "time management", "problem solving", "english", "bahasa indonesia"
+  "php", "laravel", "python", "java", "figma", "ui/ux", "scrum", "agile", "web development",
+  // Marketing & Creative
+  "marketing", "pemasaran", "social media", "sosial media", "content creator", "copywriting",
+  "seo", "sem", "digital marketing", "graphic design", "desain grafis", "photoshop", "illustrator",
+  "video editing", "canva", "branding", "public relations", "humas", "iklan", "promosi",
+  // Administration & HR & Finance
+  "administrasi", "administration", "excel", "ms office", "microsoft office", "word",
+  "powerpoint", "accounting", "akuntansi", "keuangan", "finance", "taxation", "pajak", "pph21",
+  "bpjs", "hris", "payroll", "penggajian", "recruitment", "rekrutmen", "human resources",
+  // Sales & Operations & Soft Skills
+  "sales", "penjualan", "business development", "customer service", "negosiasi", "negotiation",
+  "communication", "komunikasi", "leadership", "kepemimpinan", "project management",
+  "manajemen proyek", "time management", "problem solving", "english", "bahasa inggris",
+  "analisis data", "data analysis", "kerja tim", "teamwork", "operasional", "retail", "magang", "internship"
 ];
+
+const STOP_WORDS = new Set([
+  "yang", "dan", "di", "ke", "dari", "ini", "itu", "dengan", "untuk", "pada", "adalah",
+  "sebagai", "akan", "bisa", "dapat", "atau", "oleh", "juga", "sudah", "saya", "kami",
+  "mereka", "anda", "saudara", "harus", "wajib", "memiliki", "serta", "dalam", "secara",
+  "minimal", "pendidikan", "pengalaman", "posisi", "tugas", "tahun", "tingkat", "tentang",
+  "bisa", "secara", "serta", "with", "from", "that", "this", "have", "will", "your",
+  "their", "about", "must", "they", "them", "some", "more", "such", "than", "then",
+  "hingga", "kuota", "terpenuhi", "staf", "staff", "dibutuhkan", "persyaratan"
+]);
 
 /**
  * Fetch and extract text content from Google Drive CV links
@@ -90,38 +111,30 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
     driveCvText = await fetchGoogleDriveCVText(applicant.cvUrl);
   }
 
-  const vacancyRequirements = `${vacancy.title} ${vacancy.position} ${vacancy.department} ${vacancy.requirements} ${vacancy.description}`.toLowerCase();
-  const applicantProfile = `${applicant.name} ${applicant.coverLetter || ""} ${applicant.notes || ""} ${applicant.source || ""} ${driveCvText} ${applicant.cvUrl || ""}`.toLowerCase();
+  const vacancyTextLower = `${vacancy.title} ${vacancy.position} ${vacancy.department} ${vacancy.requirements} ${vacancy.description}`.toLowerCase();
+  const applicantProfileLower = `${applicant.name} ${applicant.coverLetter || ""} ${applicant.notes || ""} ${applicant.source || ""} ${driveCvText} ${applicant.cvUrl || ""}`.toLowerCase();
 
-  // Extract skills present in vacancy
-  const vacancySkills = COMMON_SKILLS.filter((skill) => vacancyRequirements.includes(skill));
+  // 1. Extract skills present in vacancy dictionary
+  let vacancySkills = COMMON_SKILLS.filter((skill) => vacancyTextLower.includes(skill));
 
-  // Extract skills present in applicant's profile
-  const candidateSkills = COMMON_SKILLS.filter((skill) => applicantProfile.includes(skill));
+  // 2. Fallback NLP word extraction if dictionary match is small
+  if (vacancySkills.length < 3) {
+    const words = Array.from(new Set(vacancyTextLower.match(/\b[a-zA-Z0-9_-]{3,}\b/g) || []));
+    const extractedKeywords = words.filter((w) => !STOP_WORDS.has(w) && !/^\d+$/.test(w));
+    vacancySkills = Array.from(new Set([...vacancySkills, ...extractedKeywords])).slice(0, 15);
+  }
 
   // Determine matched and missing skills
   const matchedSkills: string[] = [];
   const missingSkills: string[] = [];
 
-  if (vacancySkills.length > 0) {
-    vacancySkills.forEach((skill) => {
-      if (candidateSkills.includes(skill) || applicantProfile.includes(skill)) {
-        matchedSkills.push(skill);
-      } else {
-        missingSkills.push(skill);
-      }
-    });
-  } else {
-    // Fallback: extract key words (min length 4)
-    const keywords = Array.from(new Set(vacancyRequirements.match(/\b[a-z]{4,}\b/g) || [])).slice(0, 15);
-    keywords.forEach((word) => {
-      if (applicantProfile.includes(word)) {
-        matchedSkills.push(word);
-      } else {
-        missingSkills.push(word);
-      }
-    });
-  }
+  vacancySkills.forEach((skill) => {
+    if (applicantProfileLower.includes(skill)) {
+      matchedSkills.push(skill);
+    } else {
+      missingSkills.push(skill);
+    }
+  });
 
   // Calculate base score
   let baseScore = 50;
@@ -194,7 +207,7 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   }
 
   if (matchedSkills.length > 0) {
-    strengths.push(`Memiliki keahlian relevan terdeteksi: ${matchedSkills.slice(0, 5).join(", ")}`);
+    strengths.push(`Memiliki keahlian/kualifikasi terdeteksi: ${matchedSkills.slice(0, 5).join(", ")}`);
   }
   if (applicant.coverLetter && applicant.coverLetter.length > 150) {
     strengths.push("Surat lamaran terstruktur dengan penjelasan kualifikasi yang jelas");
@@ -204,7 +217,7 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   }
 
   if (missingSkills.length > 0) {
-    areasOfConcern.push(`Keahlian belum terdeteksi secara eksplisit: ${missingSkills.slice(0, 5).join(", ")}`);
+    areasOfConcern.push(`Keahlian/persyaratan belum terdeteksi secara eksplisit: ${missingSkills.slice(0, 5).join(", ")}`);
   }
   if (!applicant.coverLetter) {
     areasOfConcern.push("Tidak melampirkan Surat Lamaran / Cover Letter");
@@ -217,7 +230,7 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   const summary = applicant.isBlacklisted
     ? `Kandidat ${applicant.name} dalam status Blacklist. Tidak direkomendasikan untuk diproses.`
     : `Kandidat ${applicant.name} memperoleh skor AI Match ${matchScore}% untuk posisi ${vacancy.title}. ` +
-      `AI berhasil memindai berkas CV Google Drive & Cover Letter, menemukan ${matchedSkills.length} keahlian sesuai dari total ${totalReqs} kualifikasi posisi. ` +
+      `AI memindai kualifikasi, menemukan ${matchedSkills.length} keahlian yang sesuai dari total ${totalReqs} persyaratan posisi. ` +
       `Rekomendasi tindakan: ${recommendation.replace(/_/g, " ")}.`;
 
   const screeningResult: AIScreeningResult = {
