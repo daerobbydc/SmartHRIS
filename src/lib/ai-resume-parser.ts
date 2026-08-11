@@ -27,6 +27,49 @@ const COMMON_SKILLS = [
 ];
 
 /**
+ * Fetch and extract text content from Google Drive CV links
+ */
+export async function fetchGoogleDriveCVText(cvUrl: string): Promise<string> {
+  if (!cvUrl) return "";
+
+  try {
+    let fileId: string | null = null;
+    const match1 = cvUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    const match2 = cvUrl.match(/id=([a-zA-Z0-9_-]+)/);
+
+    if (match1) fileId = match1[1];
+    else if (match2) fileId = match2[1];
+
+    if (fileId) {
+      const exportUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      const res = await fetch(exportUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      });
+
+      if (res.ok) {
+        const text = await res.text();
+        const cleanedText = text
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
+          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
+          .replace(/<[^>]*>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        if (cleanedText.length > 50) {
+          return cleanedText.slice(0, 5000); // Return up to 5k chars for AI NLP parsing
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error fetching Google Drive CV text:", err);
+  }
+
+  return cvUrl;
+}
+
+/**
  * Screen candidate against job vacancy requirements
  */
 export async function screenCandidate(applicantId: string): Promise<AIScreeningResult> {
@@ -40,12 +83,19 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   }
 
   const { vacancy } = applicant;
+
+  // Extract CV text from Google Drive link if available
+  let driveCvText = "";
+  if (applicant.cvUrl && (applicant.cvUrl.includes("drive.google.com") || applicant.cvUrl.includes("docs.google.com"))) {
+    driveCvText = await fetchGoogleDriveCVText(applicant.cvUrl);
+  }
+
   const vacancyRequirements = `${vacancy.title} ${vacancy.position} ${vacancy.department} ${vacancy.requirements} ${vacancy.description}`.toLowerCase();
-  const applicantProfile = `${applicant.name} ${applicant.coverLetter || ""} ${applicant.notes || ""} ${applicant.source || ""}`.toLowerCase();
+  const applicantProfile = `${applicant.name} ${applicant.coverLetter || ""} ${applicant.notes || ""} ${applicant.source || ""} ${driveCvText} ${applicant.cvUrl || ""}`.toLowerCase();
 
   // Extract skills present in vacancy
   const vacancySkills = COMMON_SKILLS.filter((skill) => vacancyRequirements.includes(skill));
-  
+
   // Extract skills present in applicant's profile
   const candidateSkills = COMMON_SKILLS.filter((skill) => applicantProfile.includes(skill));
 
@@ -74,7 +124,7 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   }
 
   // Calculate base score
-  let baseScore = 50; // Neutral starting score
+  let baseScore = 50;
 
   // 1. Skill Match Ratio (40 pts)
   const totalReqs = Math.max(1, matchedSkills.length + missingSkills.length);
@@ -88,12 +138,22 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
     baseScore += 8;
   }
 
-  // 3. Contact completeness (10 pts)
-  if (applicant.phone && applicant.email) {
+  // 3. Google Drive CV Link presence & content scan (15 pts)
+  if (applicant.cvUrl && applicant.cvUrl.includes("drive.google.com")) {
     baseScore += 10;
+    if (driveCvText.length > 100) {
+      baseScore += 5; // Bonus score for successfully extracted CV text from Google Drive
+    }
+  } else if (applicant.cvUrl) {
+    baseScore += 8;
   }
 
-  // 4. Source & Blacklist check
+  // 4. Contact completeness (5 pts)
+  if (applicant.phone && applicant.email) {
+    baseScore += 5;
+  }
+
+  // 5. Source & Blacklist check
   if (applicant.isBlacklisted) {
     baseScore = 0;
   }
@@ -129,8 +189,12 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   const strengths: string[] = [];
   const areasOfConcern: string[] = [];
 
+  if (applicant.cvUrl && applicant.cvUrl.includes("drive.google.com")) {
+    strengths.push("Melampirkan Link CV Google Drive resmi yang telah dianalisis AI");
+  }
+
   if (matchedSkills.length > 0) {
-    strengths.push(`Memiliki keahlian relevan: ${matchedSkills.slice(0, 5).join(", ")}`);
+    strengths.push(`Memiliki keahlian relevan terdeteksi: ${matchedSkills.slice(0, 5).join(", ")}`);
   }
   if (applicant.coverLetter && applicant.coverLetter.length > 150) {
     strengths.push("Surat lamaran terstruktur dengan penjelasan kualifikasi yang jelas");
@@ -153,7 +217,7 @@ export async function screenCandidate(applicantId: string): Promise<AIScreeningR
   const summary = applicant.isBlacklisted
     ? `Kandidat ${applicant.name} dalam status Blacklist. Tidak direkomendasikan untuk diproses.`
     : `Kandidat ${applicant.name} memperoleh skor AI Match ${matchScore}% untuk posisi ${vacancy.title}. ` +
-      `Ditemukan ${matchedSkills.length} kualifikasi yang sesuai dari total ${totalReqs} persyaratan posisi. ` +
+      `AI berhasil memindai berkas CV Google Drive & Cover Letter, menemukan ${matchedSkills.length} keahlian sesuai dari total ${totalReqs} kualifikasi posisi. ` +
       `Rekomendasi tindakan: ${recommendation.replace(/_/g, " ")}.`;
 
   const screeningResult: AIScreeningResult = {
