@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Plus, AlertTriangle, Trash2, ShieldAlert, CheckCircle2, Lock } from "lucide-react";
+import { Plus, AlertTriangle, Trash2, ShieldAlert, CheckCircle2, Lock, Download } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import {
   SectionHeader,
@@ -80,6 +80,28 @@ export default function SanctionsPage() {
       }
     } catch (error) {
       console.error("Error fetching employees:", error);
+    }
+  };
+
+  const handleDownloadSP = async (sanctionId: string) => {
+    try {
+      const res = await fetch(`/api/export-pdf?type=sp&id=${sanctionId}`);
+      if (!res.ok) {
+        alert("Gagal mengunduh Surat Peringatan PDF");
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Surat_Peringatan_${sanctionId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("SP PDF Error:", err);
+      alert("Terjadi kesalahan saat mengunduh Surat Peringatan PDF");
     }
   };
 
@@ -219,17 +241,24 @@ export default function SanctionsPage() {
                       {formatDate(s.startDate)}
                       {s.endDate && ` s/d ${formatDate(s.endDate)}`}
                     </td>
-                    {canManageSanctions && (
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                         <button
-                          onClick={() => handleDelete(s.id)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950 transition"
-                          title="Hapus Sanksi"
+                          onClick={() => handleDownloadSP(s.id)}
+                          className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 font-bold rounded-lg text-xs transition inline-flex items-center gap-1"
+                          title="Cetak Surat Peringatan (SP PDF)"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Download className="h-3.5 w-3.5" /> SP PDF
                         </button>
+                        {canManageSanctions && (
+                          <button
+                            onClick={() => handleDelete(s.id)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950 transition"
+                            title="Hapus Sanksi"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </td>
-                    )}
                   </motion.tr>
                 ))
               )}

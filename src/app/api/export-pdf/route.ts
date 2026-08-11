@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAuth } from "@/lib/api-auth";
-import { generatePayslipPDF, generateSPT21PDF, generateSKKerjaPDF, generateAttendanceReportPDF } from "@/lib/pdf-export";
+import {
+  generatePayslipPDF,
+  generateSPT21PDF,
+  generateSKKerjaPDF,
+  generatePaklaringPDF,
+  generateAttendanceReportPDF,
+  generateContractPDF,
+  generateWarningLetterPDF,
+} from "@/lib/pdf-export";
 
 // GET - Generate PDF
 export async function GET(req: NextRequest) {
@@ -36,11 +44,29 @@ export async function GET(req: NextRequest) {
         break;
 
       case "sk-kerja":
+      case "paklaring":
         if (!id) {
           return NextResponse.json({ error: "Employee ID required" }, { status: 400 });
         }
-        pdfBuffer = await generateSKKerjaPDF(id);
-        filename = `sk-kerja-${id}.pdf`;
+        pdfBuffer = await generatePaklaringPDF(id);
+        filename = `Paklaring_Surat_Keterangan_Kerja_${id}.pdf`;
+        break;
+
+      case "contract":
+        if (!id) {
+          return NextResponse.json({ error: "Contract ID required" }, { status: 400 });
+        }
+        pdfBuffer = await generateContractPDF(id);
+        filename = `Surat_Perjanjian_Kerja_${id}.pdf`;
+        break;
+
+      case "warning-letter":
+      case "sp":
+        if (!id) {
+          return NextResponse.json({ error: "Sanction ID required" }, { status: 400 });
+        }
+        pdfBuffer = await generateWarningLetterPDF(id);
+        filename = `Surat_Peringatan_SP_${id}.pdf`;
         break;
 
       case "attendance-report":
@@ -49,7 +75,7 @@ export async function GET(req: NextRequest) {
         break;
 
       default:
-        return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+        return NextResponse.json({ error: "Invalid document type" }, { status: 400 });
     }
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
@@ -60,6 +86,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("PDF generation error:", error);
-    return NextResponse.json({ error: "Gagal generate PDF" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Gagal generate PDF", details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
 }

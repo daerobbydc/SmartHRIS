@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Plus, Search, AlertTriangle, Clock, CheckCircle, RefreshCw } from "lucide-react";
+import { FileText, Plus, Search, AlertTriangle, Clock, CheckCircle, RefreshCw, Download } from "lucide-react";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 
 interface Contract {
@@ -134,6 +134,28 @@ export default function ContractsPage() {
       }
     } catch (err) {
       console.error("Error:", err);
+    }
+  };
+
+  const handleDownloadContractPDF = async (contractId: string) => {
+    try {
+      const res = await fetch(`/api/export-pdf?type=contract&id=${contractId}`);
+      if (!res.ok) {
+        alert("Gagal mengunduh Surat Perjanjian Kerja PDF");
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Surat_Perjanjian_Kerja_${contractId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Contract PDF error:", err);
+      alert("Terjadi kesalahan saat mengunduh PDF Kontrak");
     }
   };
 
@@ -323,9 +345,12 @@ export default function ContractsPage() {
                           <span className="ml-1 text-[10px] text-gray-500">#{contract.renewalCount + 1}</span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right flex items-center justify-end gap-1.5">
+                        <button onClick={() => handleDownloadContractPDF(contract.id)} className="px-2.5 py-1.5 bg-teal-50 text-teal-700 hover:bg-teal-100 font-semibold rounded-lg text-[11px] transition" title="Unduh Draft Kontrak PDF">
+                          <Download className="h-3 w-3 inline mr-1" /> PDF
+                        </button>
                         {contract.status === "ACTIVE" && (
-                          <button onClick={() => setShowRenewModal(contract)} className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold rounded-lg text-[11px]">
+                          <button onClick={() => setShowRenewModal(contract)} className="px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold rounded-lg text-[11px] transition">
                             <RefreshCw className="h-3 w-3 inline mr-1" /> Perpanjang
                           </button>
                         )}

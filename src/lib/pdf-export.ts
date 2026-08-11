@@ -527,7 +527,17 @@ export async function generatePaklaringPDF(
       { align: "justify", lineGap: 4 }
     );
 
-    doc.moveDown(3);
+    doc.moveDown(2);
+
+    // Digital Stamp & Verification Badge Box
+    const stampY = doc.y + 10;
+    doc.rect(50, stampY, 200, 55).strokeColor("#0d9488").lineWidth(1).stroke();
+    doc.fillColor("#0d9488").fontSize(8).font("Helvetica-Bold").text("OFFICIAL DIGITAL SEAL & E-SIGN", 60, stampY + 8);
+    doc.fillColor("#475569").fontSize(7).font("Helvetica").text(`Verified Doc ID: ${docNumber}`, 60, stampY + 20);
+    doc.text(`Signed digitally by HR Department`, 60, stampY + 30);
+    doc.text(`Timestamp: ${new Date().toISOString()}`, 60, stampY + 40);
+
+    doc.fillColor("#000000"); // Reset color
     doc.fontSize(10).font("Helvetica").text(`Jakarta, ${formatDateLong(new Date())}`, { align: "right" });
     doc.text(companyName, { align: "right" });
     doc.moveDown(3);
@@ -537,4 +547,190 @@ export async function generatePaklaringPDF(
     doc.end();
   });
 }
+
+/**
+ * Generate Surat Perjanjian Kerja (PKWT / PKWTT) PDF
+ */
+export async function generateContractPDF(contractId: string): Promise<Buffer> {
+  const contract = await prisma.contract.findUnique({
+    where: { id: contractId },
+    include: { employee: true },
+  });
+
+  if (!contract) {
+    throw new Error("Data Kontrak tidak ditemukan");
+  }
+
+  const globalCompany = await getCompanyInfo();
+  const formatDateLong = (d: Date) =>
+    d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+  const startDate = new Date(contract.startDate);
+  const endDate = new Date(contract.endDate);
+  const isPKWT = contract.contractType === "PKWT";
+  const titleText = isPKWT
+    ? "SURAT PERJANJIAN KERJA WAKTU TERTENTU (PKWT)"
+    : "SURAT PERJANJIAN KERJA WAKTU TIDAK TERTENTU (PKWTT)";
+
+  const docNumber = `SPK/${contract.contractType}/${startDate.getFullYear()}/${contract.id.slice(-6).toUpperCase()}`;
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const chunks: Buffer[] = [];
+
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    createHeader(doc, titleText, globalCompany);
+    doc.fontSize(9).font("Helvetica").text(`Nomor: ${docNumber}`, { align: "center" });
+    doc.moveDown(1.5);
+
+    doc.fontSize(9).font("Helvetica").text(
+      `Pada hari ini, ${formatDateLong(startDate)}, dibuat dan disepakati Perjanjian Kerja antara para pihak di bawah ini:`,
+      { align: "justify" }
+    );
+    doc.moveDown(0.5);
+
+    // PIHAK PERTAMA
+    doc.font("Helvetica-Bold").text("1. PIHAK PERTAMA (PERUSAHAAN):");
+    doc.font("Helvetica").text(`   Nama Perusahaan : ${globalCompany.name}`);
+    doc.text(`   Alamat          : ${globalCompany.address}`);
+    doc.text(`   Perwakilan      : ${globalCompany.hrSignName || "Direksi / HR Management"}`);
+    doc.moveDown(0.5);
+
+    // PIHAK KEDUA
+    doc.font("Helvetica-Bold").text("2. PIHAK KEDUA (KARYAWAN):");
+    doc.font("Helvetica").text(`   Nama Karyawan   : ${contract.employee.firstName} ${contract.employee.lastName}`);
+    doc.text(`   ID Karyawan     : ${contract.employee.employeeId}`);
+    doc.text(`   Jabatan         : ${contract.position}`);
+    doc.text(`   Departemen      : ${contract.employee.department}`);
+    doc.moveDown(1);
+
+    doc.font("Helvetica").text("Para Pihak sepakat untuk mengikatkan diri dalam Perjanjian Kerja dengan ketentuan sebagai berikut:", { align: "justify" });
+    doc.moveDown(0.8);
+
+    // PASAL 1
+    doc.font("Helvetica-Bold").text("PASAL 1: JABATAN DAN MASA KERJA", { align: "center" });
+    doc.font("Helvetica").text(
+      `1. PIHAK PERTAMA mempekerjakan PIHAK KEDUA sebagai ${contract.position} pada Departemen ${contract.employee.department}.\n` +
+      `2. Perjanjian Kerja ini berlaku sejak ${formatDateLong(startDate)} ${isPKWT ? `sampai dengan ${formatDateLong(endDate)}` : "untuk waktu tidak tertentu"}.\n` +
+      `3. PIHAK KEDUA bersedia menjalani evaluasi berkala atas kinerjanya.`,
+      { lineGap: 3 }
+    );
+    doc.moveDown(0.8);
+
+    // PASAL 2
+    doc.font("Helvetica-Bold").text("PASAL 2: HAK DAN KOMPENSASI GAJI", { align: "center" });
+    doc.font("Helvetica").text(
+      `1. PIHAK KEDUA berhak menerima Gaji Pokok sebesar Rp ${Number(contract.salary).toLocaleString("id-ID")} per bulan.\n` +
+      `2. Pembayaran gaji dilaksanakan pada akhir bulan berjalan sesuai regulasi sistem payroll perusahaan.\n` +
+      `3. PIHAK KEDUA berhak mendapatkan kepesertaan BPJS Ketenagakerjaan dan BPJS Kesehatan sesuai ketentuan perundang-undangan.`,
+      { lineGap: 3 }
+    );
+    doc.moveDown(0.8);
+
+    // PASAL 3
+    doc.font("Helvetica-Bold").text("PASAL 3: TATA TERTIB & KERAHASIAAN (NDA)", { align: "center" });
+    doc.font("Helvetica").text(
+      `1. PIHAK KEDUA wajib mematuhi seluruh peraturan perusahaan, jam kerja, dan standar operasional (SOP).\n` +
+      `2. PIHAK KEDUA wajib menjaga kerahasiaan data perusahaan, kode sumber, dan informasi finansial selama maupun setelah masa kerja berakhir.`,
+      { lineGap: 3 }
+    );
+    doc.moveDown(1.5);
+
+    // SIGNATURE SECTION
+    const sigY = doc.y;
+    doc.fontSize(9).font("Helvetica-Bold").text("PIHAK PERTAMA", 60, sigY);
+    doc.text("PIHAK KEDUA", 380, sigY);
+
+    doc.moveDown(3.5);
+    const nameY = doc.y;
+    doc.font("Helvetica-Bold").text(globalCompany.name, 60, nameY);
+    doc.text(`${contract.employee.firstName} ${contract.employee.lastName}`, 380, nameY);
+
+    doc.end();
+  });
+}
+
+/**
+ * Generate Surat Peringatan (SP 1, SP 2, SP 3) PDF
+ */
+export async function generateWarningLetterPDF(sanctionId: string): Promise<Buffer> {
+  const sanction = await prisma.attendanceSanction.findUnique({
+    where: { id: sanctionId },
+  });
+
+  const employee = sanction
+    ? await prisma.employee.findUnique({ where: { id: sanction.employeeId } })
+    : null;
+
+  if (!sanction || !employee) {
+    throw new Error("Data Sanksi / Surat Peringatan tidak ditemukan");
+  }
+
+  const globalCompany = await getCompanyInfo();
+  const formatDateLong = (d: Date) =>
+    d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+  const spLevel = sanction.type === "WARNING" ? "SURAT PERINGATAN PERTAMA (SP I)" : sanction.type === "FINAL_WARNING" ? "SURAT PERINGATAN KEDUA (SP II)" : "SURAT PERINGATAN KETIGA (SP III)";
+  const spNum = `SP/HRD/${new Date(sanction.createdAt).getFullYear()}/${sanction.id.slice(-5).toUpperCase()}`;
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const chunks: Buffer[] = [];
+
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    createHeader(doc, spLevel, globalCompany);
+    doc.fontSize(10).font("Helvetica").text(`Nomor: ${spNum}`, { align: "center" });
+    doc.moveDown(2);
+
+    doc.fontSize(10).font("Helvetica").text("Surat Peringatan ini ditujukan kepada:", { align: "left" });
+    doc.moveDown(0.8);
+
+    const leftCol = 70;
+    const valueCol = 180;
+    let y = doc.y;
+
+    const details = [
+      ["Nama Karyawan", `: ${employee.firstName} ${employee.lastName}`],
+      ["ID Karyawan", `: ${employee.employeeId}`],
+      ["Departemen", `: ${employee.department}`],
+      ["Jabatan", `: ${employee.position}`],
+    ];
+
+    details.forEach(([label, val]) => {
+      doc.font("Helvetica-Bold").text(label, leftCol, y);
+      doc.font("Helvetica").text(val, valueCol, y);
+      y += 20;
+    });
+
+    doc.y = y + 15;
+    doc.font("Helvetica").text(
+      `Surat Peringatan ini diterbitkan sehubungan dengan adanya pelanggaran tata tertib perusahaan / disiplin kehadiran, dengan rincian sebagai berikut:\n\n` +
+      `Keterangan Pelanggaran: ${sanction.description}\n` +
+      `Tanggal Terbit         : ${formatDateLong(new Date(sanction.startDate))}\n` +
+      `Masa Berlaku           : 6 (Enam) Bulan sejak tanggal terbit.\n\n` +
+      `Apabila dalam masa berlaku Surat Peringatan ini Saudara kembali melakukan pelanggaran disiplin kerja, maka Perusahaan akan memberikan sanksi tingkat berikutnya sesuai peraturan perundang-undangan dan aturan internal perusahaan.\n\n` +
+      `Demikian Surat Peringatan ini dibuat untuk diperhatikan dan dijadikan bahan evaluasi diri demi perbaikan kinerja ke depan.`,
+      { align: "justify", lineGap: 4 }
+    );
+
+    doc.moveDown(3);
+    const sigY = doc.y;
+    doc.fontSize(10).font("Helvetica-Bold").text("Atasan / HR Manager", 60, sigY);
+    doc.text("Karyawan Bersangkutan", 360, sigY);
+
+    doc.moveDown(3.5);
+    const nameY = doc.y;
+    doc.font("Helvetica-Bold").text(globalCompany.hrSignName || "HR Manager", 60, nameY);
+    doc.text(`${employee.firstName} ${employee.lastName}`, 360, nameY);
+
+    doc.end();
+  });
+}
+
 
