@@ -1,35 +1,48 @@
 import PDFDocument from "pdfkit/js/pdfkit.standalone";
 import { prisma } from "@/lib/prisma";
-import { getCompanyInfo } from "@/lib/company-config";
+import { getCompanyInfo, CompanyInfo } from "@/lib/company-config";
 
 // ==================== PDF EXPORT SYSTEM ====================
 
-interface CompanyInfo {
-  name: string;
-  address: string;
-  phone: string;
-  email: string;
-  npwp: string;
-}
-
 const DEFAULT_COMPANY: CompanyInfo = {
   name: "PT SmartHRIS Indonesia",
-  address: "Jl. Teknologi No. 123, Jakarta Selatan",
+  address: "Jl. Teknologi No. 123, Jakarta Selatan, DKI Jakarta 12930",
   phone: "021-1234-5678",
   email: "info@smarthris.com",
   npwp: "12.345.678.9-012.000",
+  hrSignName: "Budi Santoso, M.Psi",
+  hrSignTitle: "Head of Human Capital Management",
 };
 
 function createHeader(doc: PDFKit.PDFDocument, title: string, company: CompanyInfo = DEFAULT_COMPANY) {
+  if (company.letterheadLogo) {
+    try {
+      const imgData = company.letterheadLogo.startsWith("data:image")
+        ? Buffer.from(company.letterheadLogo.split(",")[1], "base64")
+        : company.letterheadLogo;
+
+      doc.image(imgData, 50, doc.y, { fit: [495, 65], align: "center" });
+      doc.y += 70;
+    } catch (e) {
+      console.error("Failed to render company letterhead image in PDF, fallback to text header:", e);
+      renderTextHeader(doc, company);
+    }
+  } else {
+    renderTextHeader(doc, company);
+  }
+
+  doc.moveDown(0.4);
+  doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#0d9488").lineWidth(1.5).stroke();
+  doc.moveDown(0.5);
+  doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text(title, { align: "center" });
+  doc.moveDown(0.5);
+}
+
+function renderTextHeader(doc: PDFKit.PDFDocument, company: CompanyInfo) {
   doc.fontSize(16).font("Helvetica-Bold").text(company.name, { align: "center" });
   doc.fontSize(9).font("Helvetica").text(company.address, { align: "center" });
   doc.text(`Telp: ${company.phone} | Email: ${company.email}`, { align: "center" });
   doc.text(`NPWP: ${company.npwp}`, { align: "center" });
-  doc.moveDown(0.5);
-  doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-  doc.moveDown(0.5);
-  doc.fontSize(14).font("Helvetica-Bold").text(title, { align: "center" });
-  doc.moveDown(0.5);
 }
 
 function addWatermark(doc: PDFKit.PDFDocument, text: string = "CONFIDENTIAL") {
@@ -42,9 +55,6 @@ function addWatermark(doc: PDFKit.PDFDocument, text: string = "CONFIDENTIAL") {
   doc.restore();
 }
 
-/**
- * Generate Payslip PDF
- */
 /**
  * Generate Payslip PDF matching Indonesian corporate standard layout
  */
@@ -71,7 +81,6 @@ export async function generatePayslipPDF(payrollId: string): Promise<Buffer> {
     year: "numeric",
   });
 
-  // Get Employee Salary & Bank info
   const empSalary = await prisma.employeeSalary.findUnique({
     where: { employeeId: emp.id },
   });
@@ -84,131 +93,94 @@ export async function generatePayslipPDF(payrollId: string): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    // 1. Company Header
-    doc.fontSize(16).font("Helvetica-Bold").text(globalCompany.name, { align: "center" });
-    doc.fontSize(9).font("Helvetica").text(globalCompany.address, { align: "center" });
+    // Header
+    createHeader(doc, `SLIP GAJI KARYAWAN - ${periodMonthStr.toUpperCase()}`, globalCompany);
+
+    // Employee Meta Info Table
+    const metaTop = doc.y;
+    doc.fontSize(9).font("Helvetica-Bold").text("DATA KARYAWAN", 50, metaTop);
+    doc.font("Helvetica");
+
+    doc.text(`NIK Karyawan  : ${emp.employeeId}`, 50, metaTop + 15);
+    doc.text(`Nama Karyawan : ${emp.firstName} ${emp.lastName}`, 50, metaTop + 28);
+    doc.text(`Departemen    : ${emp.department}`, 50, metaTop + 41);
+    doc.text(`Jabatan       : ${emp.position}`, 50, metaTop + 54);
+
+    doc.font("Helvetica-Bold").text("INFORMASI PERBANKAN & PAJAK", 300, metaTop);
+    doc.font("Helvetica");
+    doc.text(`Bank          : ${emp.bankName || empSalary?.bankName || "BCA"}`, 300, metaTop + 15);
+    doc.text(`No. Rekening  : ${emp.bankAccount || empSalary?.bankAccount || "-"}`, 300, metaTop + 28);
+    doc.text(`NPWP          : ${emp.npwp || empSalary?.npwp || "-"}`, 300, metaTop + 41);
+    doc.text(`Status PTKP   : ${emp.ptkp || empSalary?.ptkp || "TK/0"}`, 300, metaTop + 54);
+
+    doc.y = metaTop + 75;
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#cbd5e1").lineWidth(1).stroke();
     doc.moveDown(0.8);
 
-    doc.fontSize(11).font("Helvetica-Bold").text(`Slip Gaji Periode ${periodMonthStr}`, { align: "left" });
-    doc.moveDown(0.4);
+    // Earnings & Deductions Layout
+    const tableTop = doc.y;
+    const colWidth = 240;
 
-    // Horizontal Divider Line
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(0.8).strokeColor("#333333").stroke();
-    doc.moveDown(0.8);
+    // Left Box: EARNINGS
+    doc.fillColor("#065f46").fontSize(10).font("Helvetica-Bold").text("PENERIMAAN (EARNINGS)", 50, tableTop);
+    doc.fillColor("#000000").fontSize(9).font("Helvetica");
 
-    // 2. Employee Details Grid (2 Columns)
-    const leftColX = 40;
-    const rightColX = 310;
-    let gridY = doc.y;
+    let leftY = tableTop + 18;
+    const addEarningRow = (label: string, val: number) => {
+      if (val <= 0 && label !== "Gaji Pokok") return;
+      doc.text(label, 50, leftY);
+      doc.text(`Rp ${val.toLocaleString("id-ID")}`, 50 + colWidth - 80, leftY, { align: "right", width: 80 });
+      leftY += 16;
+    };
 
-    const paidAtDate = payroll.paidAt
-      ? new Date(payroll.paidAt).toLocaleDateString("id-ID")
-      : new Date().toLocaleDateString("id-ID");
+    addEarningRow("Gaji Pokok", Number(payroll.baseSalary));
+    addEarningRow("Tunjangan Jabatan/Operasional", Number(payroll.allowance));
+    addEarningRow("Upah Lembur (Overtime)", Number(payroll.overtime));
+    addEarningRow("Bonus & Insentif", Number(payroll.bonus));
+    addEarningRow("Tunjangan Hari Raya (THR)", Number(payroll.thr));
 
-    // Left Column Info
-    doc.font("Helvetica").fontSize(9);
-    doc.text("Nama", leftColX, gridY).text(`: ${emp.firstName} ${emp.lastName}`, leftColX + 80, gridY);
-    gridY += 14;
-    doc.text("Departemen", leftColX, gridY).text(`: ${emp.department}`, leftColX + 80, gridY);
-    gridY += 14;
-    doc.text("Jabatan", leftColX, gridY).text(`: ${emp.position}`, leftColX + 80, gridY);
-    gridY += 14;
-    doc.text("Tanggal Gajian", leftColX, gridY).text(`: ${paidAtDate}`, leftColX + 80, gridY);
+    // Right Box: DEDUCTIONS
+    doc.fillColor("#991b1b").fontSize(10).font("Helvetica-Bold").text("POTONGAN (DEDUCTIONS)", 300, tableTop);
+    doc.fillColor("#000000").fontSize(9).font("Helvetica");
 
-    // Right Column Info
-    let rightY = doc.y - 42;
-    const bpjsTkNum = emp.nik ? `ID/MB/${emp.nik.slice(-4)}` : "-";
-    const bpjsKesNum = emp.nik ? emp.nik.slice(0, 4) : "-";
-    const bankAccountStr = emp.bankAccount || empSalary?.bankAccount || "-";
+    let rightY = tableTop + 18;
+    const addDeductionRow = (label: string, val: number) => {
+      if (val <= 0) return;
+      doc.text(label, 300, rightY);
+      doc.text(`Rp ${val.toLocaleString("id-ID")}`, 300 + colWidth - 80, rightY, { align: "right", width: 80 });
+      rightY += 16;
+    };
 
-    doc.text("No. BPJS Ketenagakerjaan", rightColX, rightY).text(`: ${bpjsTkNum}`, rightColX + 130, rightY);
-    rightY += 14;
-    doc.text("No. BPJS Kesehatan", rightColX, rightY).text(`: ${bpjsKesNum}`, rightColX + 130, rightY);
-    rightY += 14;
-    doc.text("Hari Kerja", rightColX, rightY).text(": 22", rightColX + 130, rightY);
-    rightY += 14;
-    doc.text("Rekening Bank", rightColX, rightY).text(`: ${bankAccountStr}`, rightColX + 130, rightY);
+    addDeductionRow("PPh 21 TER", Number(payroll.pph21 || payroll.tax));
+    addDeductionRow("BPJS JHT (Pekerja 2%)", Number(payroll.bpjsJhtEmployee));
+    addDeductionRow("BPJS JP (Pekerja 1%)", Number(payroll.bpjsJpEmployee));
+    addDeductionRow("BPJS Kesehatan (Pekerja 1%)", Number(payroll.bpjsKesehatanEmployee));
+    addDeductionRow("Potongan Lainnya", Number(payroll.deduction));
 
-    doc.y = Math.max(gridY, rightY) + 12;
-
-    // Horizontal Divider Line
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(0.8).strokeColor("#333333").stroke();
-    doc.moveDown(0.8);
-
-    // 3. Two Column Table (Pendapatan vs Potongan)
-    const tableY = doc.y;
-    doc.font("Helvetica-Bold").fontSize(10).text("Pendapatan", leftColX, tableY);
-    doc.text("Potongan", rightColX, tableY);
-
-    let curEarningsY = tableY + 18;
-    let curDeductionsY = tableY + 18;
-
-    const baseSalaryNum = Number(payroll.baseSalary);
-    const allowanceNum = Number(payroll.allowance);
-    const overtimeNum = Number(payroll.overtime);
-    const bonusNum = Number(payroll.bonus) + Number(payroll.thr);
-
-    const earningsItems = [
-      { label: "Gaji Pokok", amount: baseSalaryNum },
-      { label: "Tunjangan Transportasi", amount: allowanceNum > 0 ? Math.round(allowanceNum * 0.6) : 0 },
-      { label: "Uang Makan", amount: allowanceNum > 0 ? Math.round(allowanceNum * 0.4) : 0 },
-      { label: "Insentif / Lembur", amount: overtimeNum + bonusNum },
-    ].filter((i) => i.amount >= 0);
-
-    earningsItems.forEach((item) => {
-      doc.font("Helvetica").fontSize(9);
-      doc.text(item.label, leftColX, curEarningsY);
-      doc.text(`: Rp${item.amount.toLocaleString("id-ID")}`, leftColX + 120, curEarningsY);
-      curEarningsY += 14;
-    });
-
-    const pph21Num = Number(payroll.pph21) || Number(payroll.tax);
-    const bpjsTkEmpNum = Number(payroll.bpjsJhtEmployee) + Number(payroll.bpjsJpEmployee);
-    const bpjsKesEmpNum = Number(payroll.bpjsKesehatanEmployee);
-
-    const deductionsItems = [
-      { label: "Pajak PPh 21", amount: pph21Num },
-      { label: "BPJS Ketenagakerjaan", amount: bpjsTkEmpNum },
-      { label: "BPJS Kesehatan", amount: bpjsKesEmpNum },
-    ];
-
-    deductionsItems.forEach((item) => {
-      doc.font("Helvetica").fontSize(9);
-      doc.text(item.label, rightColX, curDeductionsY);
-      doc.text(`: Rp${item.amount.toLocaleString("id-ID")}`, rightColX + 130, curDeductionsY);
-      curDeductionsY += 14;
-    });
-
-    const maxY = Math.max(curEarningsY, curDeductionsY) + 10;
+    const maxY = Math.max(leftY, rightY) + 10;
     doc.y = maxY;
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#cbd5e1").lineWidth(1).stroke();
 
-    // Horizontal Divider Line
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(0.8).strokeColor("#333333").stroke();
+    // Summary Net Salary Banner
     doc.moveDown(0.8);
+    const summaryY = doc.y;
+    doc.rect(50, summaryY, 495, 35).fillAndStroke("#f0fdf4", "#16a34a");
+    doc.fillColor("#166534").fontSize(11).font("Helvetica-Bold").text("TAKE HOME PAY (GAJI BERSIH):", 65, summaryY + 11);
+    doc.fillColor("#15803d").fontSize(13).font("Helvetica-Bold").text(`Rp ${Number(payroll.netSalary).toLocaleString("id-ID")}`, 300, summaryY + 10, { align: "right", width: 230 });
 
-    // 4. Totals Breakdown
-    const totalEarningsNum = Number(payroll.grossIncome) || earningsItems.reduce((a, b) => a + b.amount, 0);
-    const totalDeductionsNum = Number(payroll.totalDeduction) || deductionsItems.reduce((a, b) => a + b.amount, 0);
-    const netSalaryNum = Number(payroll.netSalary);
+    doc.fillColor("#000000");
+    doc.moveDown(3);
 
-    let totalsY = doc.y;
-    doc.font("Helvetica-Bold").fontSize(9);
-    doc.text("Total Pendapatan", leftColX, totalsY);
-    doc.text(`:Rp${totalEarningsNum.toLocaleString("id-ID")}`, leftColX + 120, totalsY);
+    // Signatures
+    const sigY = doc.y + 15;
+    doc.fontSize(9).font("Helvetica").text("Diterima oleh,", 60, sigY);
+    doc.text("Disetujui oleh,", 380, sigY);
 
-    doc.text("Total Potongan", rightColX, totalsY);
-    doc.text(`: Rp${totalDeductionsNum.toLocaleString("id-ID")}`, rightColX + 130, totalsY);
-    totalsY += 18;
-
-    doc.text("Gaji Bersih", rightColX, totalsY);
-    doc.text(`: Rp${netSalaryNum.toLocaleString("id-ID")}`, rightColX + 130, totalsY);
-
-    // 5. Signature Block
-    doc.y = totalsY + 40;
-    const signY = doc.y;
-    doc.font("Helvetica").fontSize(9);
-    doc.text(`Jakarta, ${paidAtDate}`, 380, signY, { align: "right" });
-    doc.text("Manager", 380, signY + 30, { align: "right" });
+    doc.moveDown(3.5);
+    const nameY = doc.y;
+    doc.font("Helvetica-Bold").text(`${emp.firstName} ${emp.lastName}`, 60, nameY);
+    doc.font("Helvetica-Bold").text(globalCompany.hrSignName || "Budi Santoso, M.Psi", 380, nameY);
+    doc.font("Helvetica").text(globalCompany.hrSignTitle || "Head of Human Capital", 380, nameY + 12);
 
     doc.end();
   });
@@ -232,7 +204,7 @@ export async function generateSPT21PDF(employeeId: string, year: number): Promis
     throw new Error("Employee not found");
   }
 
-  // Get NPWP from EmployeeSalary
+  const globalCompany = await getCompanyInfo();
   const empSalary = await prisma.employeeSalary.findUnique({
     where: { employeeId },
   });
@@ -246,16 +218,16 @@ export async function generateSPT21PDF(employeeId: string, year: number): Promis
     doc.on("error", reject);
 
     addWatermark(doc, "SPT PAJAK");
-    createHeader(doc, `SPT TAHUNAN PPh 21 TAHUN PAJAK ${year}`);
+    createHeader(doc, `SPT TAHUNAN PPh 21 TAHUN PAJAK ${year}`, globalCompany);
 
-    doc.fontSize(10).font("Helvetica-Bold").text("DATA EMPLOYER");
+    doc.fontSize(10).font("Helvetica-Bold").text("DATA PEMBERI KERJA (EMPLOYER)");
     doc.font("Helvetica")
-      .text(`NPWP: ${DEFAULT_COMPANY.npwp}`)
-      .text(`Nama: ${DEFAULT_COMPANY.name}`)
-      .text(`Alamat: ${DEFAULT_COMPANY.address}`);
+      .text(`NPWP: ${globalCompany.npwp}`)
+      .text(`Nama: ${globalCompany.name}`)
+      .text(`Alamat: ${globalCompany.address}`);
 
     doc.moveDown();
-    doc.fontSize(10).font("Helvetica-Bold").text("DATA EMPLOYE");
+    doc.fontSize(10).font("Helvetica-Bold").text("DATA KARYAWAN (EMPLOYEE)");
     doc.font("Helvetica")
       .text(`NPWP: ${empSalary?.npwp || "-"}`)
       .text(`Nama: ${employee.firstName} ${employee.lastName}`)
@@ -300,61 +272,7 @@ export async function generateSPT21PDF(employeeId: string, year: number): Promis
  * Generate SK Keterangan Kerja PDF
  */
 export async function generateSKKerjaPDF(employeeId: string): Promise<Buffer> {
-  const employee = await prisma.employee.findUnique({
-    where: { id: employeeId },
-  });
-
-  if (!employee) {
-    throw new Error("Employee not found");
-  }
-
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
-    const chunks: Buffer[] = [];
-
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-
-    addWatermark(doc, "SURAT KETERANGAN");
-    createHeader(doc, "SURAT KETERANGAN KERJA");
-
-    const skNumber = `SK/${employee.employeeId || "001"}/${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
-    doc.fontSize(10).font("Helvetica").text(`Nomor: ${skNumber}`);
-    doc.moveDown();
-
-    doc.text(`Yang bertanda tangan di bawah ini, mewakili ${DEFAULT_COMPANY.name},`);
-    doc.moveDown(0.5);
-    doc.text("dengan ini menerangkan bahwa:");
-    doc.moveDown();
-
-    doc.fontSize(11).font("Helvetica-Bold");
-    doc.text(`Nama: ${employee.firstName} ${employee.lastName}`, { indent: 20 });
-    doc.font("Helvetica")
-      .text(`NIK: ${employee.nik || "-"}`, { indent: 20 })
-      .text(`Tempat/Tanggal Lahir: -, ${employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString("id-ID") : "-"}`, { indent: 20 })
-      .text(`Jabatan: ${employee.position}`, { indent: 20 })
-      .text(`Departemen: ${employee.department}`, { indent: 20 })
-      .text(`Status: ${employee.status === "ACTIVE" ? "Aktif" : "Tidak Aktif"}`, { indent: 20 });
-
-    doc.moveDown();
-    doc.text(`adalah benar-benar karyawan di perusahaan kami sejak tanggal ${new Date(employee.hireDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}.`);
-    doc.moveDown();
-    doc.text("Surat keterangan ini diberikan atas permintaan yang bersangkutan untuk keperluan:");
-    doc.moveDown(0.5);
-    doc.text("- Kepentingan administrasi lainnya", { indent: 20 });
-    doc.moveDown();
-    doc.text("Demikian surat keterangan ini kami buat dengan sebenarnya dan dapat dipergunakan sebagaimana mestinya.");
-    doc.moveDown(3);
-
-    doc.text(`Jakarta, ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`);
-    doc.moveDown(3);
-    doc.text("_________________________");
-    doc.font("Helvetica-Bold").text("HR Manager");
-    doc.font("Helvetica").text(DEFAULT_COMPANY.name);
-
-    doc.end();
-  });
+  return generatePaklaringPDF(employeeId);
 }
 
 /**
@@ -378,6 +296,8 @@ export async function generateAttendanceReportPDF(month: number, year: number, d
     orderBy: { date: "asc" },
   });
 
+  const globalCompany = await getCompanyInfo();
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 40 });
     const chunks: Buffer[] = [];
@@ -389,7 +309,7 @@ export async function generateAttendanceReportPDF(month: number, year: number, d
     addWatermark(doc, "LAPORAN");
 
     const monthName = new Date(year, month - 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-    createHeader(doc, `LAPORAN KEHADIRAN - ${monthName}`);
+    createHeader(doc, `LAPORAN KEHADIRAN KARYAWAN - ${monthName}`, globalCompany);
 
     const tableTop = doc.y;
     const colWidths = [30, 120, 80, 80, 80, 80, 80, 120];
@@ -398,36 +318,39 @@ export async function generateAttendanceReportPDF(month: number, year: number, d
     doc.fontSize(8).font("Helvetica-Bold");
     let x = 40;
     headers.forEach((header, i) => {
-      doc.text(header, x, tableTop, { width: colWidths[i], align: "center" });
+      doc.text(header, x, tableTop, { width: colWidths[i] });
       x += colWidths[i];
     });
 
-    doc.moveDown(0.5);
-    doc.moveTo(40, doc.y).lineTo(760, doc.y).stroke();
-    doc.moveDown(0.3);
+    doc.moveTo(40, doc.y + 5).lineTo(780, doc.y + 5).stroke();
 
-    doc.font("Helvetica").fontSize(8);
-    attendance.slice(0, 40).forEach((att, idx) => {
-      const y = doc.y;
+    let y = tableTop + 20;
+    doc.font("Helvetica");
+
+    attendance.forEach((att, idx) => {
+      if (y > 520) {
+        doc.addPage({ size: "A4", layout: "landscape", margin: 40 });
+        y = 40;
+      }
+
       x = 40;
+      doc.text((idx + 1).toString(), x, y, { width: colWidths[0] });
+      x += colWidths[0];
+      doc.text(`${att.employee.firstName} ${att.employee.lastName}`, x, y, { width: colWidths[1] });
+      x += colWidths[1];
+      doc.text(att.employee.department, x, y, { width: colWidths[2] });
+      x += colWidths[2];
+      doc.text(new Date(att.date).toLocaleDateString("id-ID"), x, y, { width: colWidths[3] });
+      x += colWidths[3];
+      doc.text(att.checkIn ? new Date(att.checkIn).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-", x, y, { width: colWidths[4] });
+      x += colWidths[4];
+      doc.text(att.checkOut ? new Date(att.checkOut).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-", x, y, { width: colWidths[5] });
+      x += colWidths[5];
+      doc.text(att.status, x, y, { width: colWidths[6] });
+      x += colWidths[6];
+      doc.text(att.notes || "-", x, y, { width: colWidths[7] });
 
-      const rowData = [
-        (idx + 1).toString(),
-        `${att.employee.firstName} ${att.employee.lastName}`,
-        att.employee.department,
-        new Date(att.date).toLocaleDateString("id-ID"),
-        att.checkIn ? new Date(att.checkIn).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-",
-        att.checkOut ? new Date(att.checkOut).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-",
-        att.status,
-        att.notes || "-",
-      ];
-
-      rowData.forEach((cell, i) => {
-        doc.text(cell, x, y, { width: colWidths[i], align: "center" });
-        x += colWidths[i];
-      });
-
-      doc.moveDown(0.3);
+      y += 15;
     });
 
     doc.end();
@@ -456,31 +379,25 @@ export async function generatePaklaringPDF(
     throw new Error("Karyawan tidak ditemukan");
   }
 
-  let paklaringDoc: any = null;
+  let paklaringDoc: Record<string, unknown> | null = null;
   try {
-    paklaringDoc = await (prisma as any).paklaringDocument?.findUnique({
-      where: { employeeId },
-    });
+    paklaringDoc = await (prisma as unknown as Record<string, unknown>).paklaringDocument as Record<string, unknown>;
   } catch (e) {
-    // Fallback if relation model not present in Prisma Client
+    // Fallback if relation model not present
   }
 
   const hireDate = employee.hireDate ? new Date(employee.hireDate) : new Date();
   const exitDate = new Date();
-
   const globalCompany = await getCompanyInfo();
 
-  const companyName = options?.companyName || paklaringDoc?.companyName || globalCompany.name;
-  const docNumber = options?.documentNumber || paklaringDoc?.documentNumber || `SKK/HRD/${companyName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10)}/${new Date().getFullYear()}/${Date.now().toString().slice(-4)}`;
-  const hrName = options?.hrSignName || paklaringDoc?.hrSignName || globalCompany.hrSignName || "Budi Santoso, M.Psi";
-  const hrTitle = options?.hrSignTitle || paklaringDoc?.hrSignTitle || globalCompany.hrSignTitle || "Head of Human Capital Management";
+  const companyName = options?.companyName || (paklaringDoc?.companyName as string) || globalCompany.name;
+  const docNumber = options?.documentNumber || (paklaringDoc?.documentNumber as string) || `SKK/HRD/${companyName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10)}/${new Date().getFullYear()}/${Date.now().toString().slice(-4)}`;
+  const hrName = options?.hrSignName || (paklaringDoc?.hrSignName as string) || globalCompany.hrSignName || "Budi Santoso, M.Psi";
+  const hrTitle = options?.hrSignTitle || (paklaringDoc?.hrSignTitle as string) || globalCompany.hrSignTitle || "Head of Human Capital Management";
 
   const companyInfo: CompanyInfo = {
+    ...globalCompany,
     name: companyName,
-    address: globalCompany.address,
-    phone: globalCompany.phone,
-    email: globalCompany.email,
-    npwp: globalCompany.npwp,
   };
 
   return new Promise((resolve, reject) => {
@@ -537,7 +454,7 @@ export async function generatePaklaringPDF(
     doc.text(`Signed digitally by HR Department`, 60, stampY + 30);
     doc.text(`Timestamp: ${new Date().toISOString()}`, 60, stampY + 40);
 
-    doc.fillColor("#000000"); // Reset color
+    doc.fillColor("#000000");
     doc.fontSize(10).font("Helvetica").text(`Jakarta, ${formatDateLong(new Date())}`, { align: "right" });
     doc.text(companyName, { align: "right" });
     doc.moveDown(3);
@@ -732,5 +649,3 @@ export async function generateWarningLetterPDF(sanctionId: string): Promise<Buff
     doc.end();
   });
 }
-
-
