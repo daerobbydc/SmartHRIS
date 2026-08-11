@@ -17,17 +17,12 @@ import {
   ShieldCheck,
   Building2,
   UserCheck,
+  Globe,
+  Radio,
+  Server,
+  Terminal,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  SectionHeader,
-  StatCard,
-  ModernButton,
-  AnimatedBadge,
-  Modal,
-  LoadingSpinner,
-} from "@/components/ui";
 
 interface Device {
   id: string;
@@ -66,8 +61,10 @@ export default function FingerprintIntegrationPage() {
   const [logs, setLogs] = useState<BiometricLog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [showDeviceModal, setShowDeviceModal] = useState<boolean>(false);
-  const [showBridgeModal, setShowBridgeModal] = useState<boolean>(false);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
+  const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
+
+  const [baseUrl, setBaseUrl] = useState<string>("");
 
   // New Device Form
   const [newDevice, setNewDevice] = useState({
@@ -89,6 +86,9 @@ export default function FingerprintIntegrationPage() {
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setBaseUrl(`${window.location.origin}/api/biometric/push`);
+    }
     fetchDevices();
     fetchLogs();
   }, []);
@@ -173,9 +173,12 @@ export default function FingerprintIntegrationPage() {
     setMessage(null);
 
     try {
-      const res = await fetch("/api/integrations/fingerprint", {
+      const res = await fetch("/api/biometric/push", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-device-code": simForm.deviceCode || "FP-SIMULATOR-01",
+        },
         body: JSON.stringify({
           deviceCode: simForm.deviceCode || "FP-SIMULATOR-01",
           employeePin: simForm.employeePin,
@@ -188,7 +191,7 @@ export default function FingerprintIntegrationPage() {
       const data = await res.json();
 
       if (res.ok) {
-        const resText = data.results?.[0]?.message || "Simulasi scan berhasil diproses!";
+        const resText = data.results?.[0]?.message || "Log push biometric berhasil diproses!";
         setMessage({ text: resText, type: "success" });
         fetchLogs();
         fetchDevices();
@@ -202,55 +205,34 @@ export default function FingerprintIntegrationPage() {
     }
   };
 
-  const bridgeCodeSnippet = `// SmartHRIS Local LAN Fingerprint Bridge Agent (Node.js)
-const axios = require('axios');
-
-const SMARTHRIS_WEBHOOK_URL = 'http://localhost:3000/api/integrations/fingerprint';
-const DEVICE_CODE = 'FP-LOBI-01';
-
-// Simulasi event listener dari mesin lokal (Port 4370 UDP/TCP)
-function onFingerprintScan(employeePin, scanType = 'CHECK_IN') {
-  console.log(\`[SCAN DETECTED] PIN: \${employeePin}\`);
-  
-  axios.post(SMARTHRIS_WEBHOOK_URL, {
-    deviceCode: DEVICE_CODE,
-    employeePin: employeePin,
-    timestamp: new Date().toISOString(),
-    scanType: scanType,
-    verifyMode: 'FINGERPRINT'
-  }).then(res => {
-    console.log('✅ Synchronized to SmartHRIS Cloud:', res.data);
-  }).catch(err => {
-    console.error('❌ Sync failed:', err.message);
-  });
-}
-
-// Menjalankan listener
-console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Device...');
-`;
+  const copyPushUrl = () => {
+    navigator.clipboard.writeText(baseUrl);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
 
   return (
     <div className="space-y-6 pb-12">
       {/* Top Banner Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-teal-700 via-teal-800 to-indigo-900 p-6 rounded-2xl text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-teal-400/10 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="space-y-1 z-10">
           <div className="flex items-center gap-2">
             <Fingerprint className="h-7 w-7 text-teal-300" />
-            <h1 className="text-2xl font-bold tracking-tight">Integrasi Realtime Mesin Fingerprint</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Integrasi Realtime Mesin Fingerprint (ADMS Push)</h1>
           </div>
           <p className="text-teal-100 text-sm">
-            Koneksikan mesin sidik jari/wajah fisik Solution, ZKTeco, & Fingerspot secara instan via Push Webhook / ADMS API.
+            Terima log presensi dari mesin Solution, ZKTeco, & Hikvision secara otomatis via Push Webhook tanpa polling manual.
           </p>
         </div>
 
         <div className="flex items-center gap-2 z-10 shrink-0">
           <button
-            onClick={() => setShowBridgeModal(true)}
+            onClick={() => setShowGuideModal(true)}
             className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl border border-white/20 backdrop-blur-md transition flex items-center gap-2"
           >
-            <Code2 className="h-4 w-4" /> Kode Local Agent
+            <Info className="h-4 w-4" /> Panduan Konfigurasi Mesin
           </button>
           <button
             onClick={() => setShowDeviceModal(true)}
@@ -261,49 +243,57 @@ console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Devi
         </div>
       </div>
 
-      {/* Alert Message Notification */}
-      <AnimatePresence>
-        {message && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className={cn(
-              "p-4 rounded-xl flex items-center justify-between shadow-md",
-              message.type === "success"
-                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                : "bg-red-50 text-red-800 border border-red-200"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              {message.type === "success" ? (
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-              ) : (
-                <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
-              )}
-              <p className="text-sm font-medium">{message.text}</p>
+      {/* Push Webhook Server URL Info Box */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-5 text-white border border-slate-700 shadow-md">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Radio className="h-3.5 w-3.5 animate-pulse text-emerald-400" /> Webhook Push Server URL Realtime
+            </span>
+            <h2 className="text-sm font-bold text-slate-200">
+              Masukkan URL ini pada menu Cloud Server / ADMS / HTTP Listening di Mesin Fisik
+            </h2>
+            <div className="flex items-center gap-2 text-xs font-mono text-emerald-300 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 select-all overflow-x-auto">
+              <span>{baseUrl || "/api/biometric/push"}</span>
             </div>
-            <button
-              onClick={() => setMessage(null)}
-              className="text-xs font-bold underline ml-4 hover:opacity-75"
-            >
-              Tutup
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+          <button
+            onClick={copyPushUrl}
+            className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shrink-0 shadow-md"
+          >
+            {copiedUrl ? <CheckCircle2 className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+            {copiedUrl ? "URL Tersalin!" : "Salin Push URL"}
+          </button>
+        </div>
+      </div>
 
-      {/* Grid: Connected Hardware Devices & Test Simulator */}
+      {/* Notification Banner */}
+      {message && (
+        <div
+          className={cn(
+            "p-4 rounded-xl text-xs font-semibold flex items-center gap-2 border transition",
+            message.type === "success"
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+              : "bg-rose-50 text-rose-800 border-rose-200"
+          )}
+        >
+          {message.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+          )}
+          {message.text}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column (2 Cols): Registered Devices & Webhook Simulator */}
+        {/* Left 2-Columns: Registered Hardware & Simulator */}
         <div className="lg:col-span-2 space-y-6">
-          
           {/* Registered Hardware List */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <Cpu className="h-5 w-5 text-teal-600" /> Perangkat Mesin Biometric Terhubung ({devices.length})
+                <Cpu className="h-5 w-5 text-teal-600" /> Mesin Biometric Terhubung ({devices.length})
               </h2>
               <button
                 onClick={fetchDevices}
@@ -319,7 +309,7 @@ console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Devi
                 <Fingerprint className="h-10 w-10 text-gray-300 mx-auto" />
                 <p className="text-sm font-semibold text-gray-700">Belum Ada Mesin Terdaftar</p>
                 <p className="text-xs text-gray-400">
-                  Klik &quot;Tambah Mesin&quot; untuk mendaftarkan mesin fingerprint Solution / ZKTeco kantor Anda.
+                  Mesin fisik Solution / ZKTeco / Hikvision akan otomatis terdaftar saat pertama kali mengirim Push Log.
                 </p>
               </div>
             ) : (
@@ -331,10 +321,15 @@ console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Devi
                   >
                     <div className="flex items-start justify-between">
                       <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          {device.deviceCode}
-                        </span>
-                        <h3 className="text-sm font-bold text-gray-900">{device.name}</h3>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            {device.deviceCode}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-extrabold bg-green-50 text-green-700 rounded-full">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" /> ONLINE
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-bold text-gray-900 mt-1">{device.name}</h3>
                       </div>
                       <button
                         onClick={() => handleDeleteDevice(device.id, device.name)}
@@ -347,9 +342,12 @@ console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Devi
 
                     <div className="text-xs space-y-1 text-gray-600">
                       <p>📍 <strong>Lokasi:</strong> {device.location || "-"}</p>
-                      {device.ipAddress && <p>🌐 <strong>IP Address:</strong> {device.ipAddress}</p>}
+                      <p className="flex items-center gap-1">
+                        <Globe className="h-3.5 w-3.5 text-gray-400" />
+                        <strong>IP Address:</strong> {device.ipAddress || "Auto-detected"}
+                      </p>
                       <p className="text-[11px] text-gray-400">
-                        ⏱ Last Sync: {device.lastSyncAt ? formatDate(device.lastSyncAt) : "Belum Pernah Sync"}
+                        ⏱ Terakhir Sync: {device.lastSyncAt ? formatDate(device.lastSyncAt) : "Belum Ada"}
                       </p>
                     </div>
 
@@ -367,9 +365,11 @@ console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Devi
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <div className="border-b border-gray-100 pb-3">
               <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <Send className="h-5 w-5 text-indigo-600" /> Simulator Transaksi Realtime Scan
+                <Send className="h-5 w-5 text-indigo-600" /> Simulator Realtime Push Webhook
               </h2>
-              <p className="text-xs text-gray-500">Uji coba pengiriman payload webhook dari mesin fingerprint ke SmartHRIS</p>
+              <p className="text-xs text-gray-500">
+                Uji coba pengiriman payload scan dari mesin fingerprint ke endpoint SmartHRIS (`/api/biometric/push`)
+              </p>
             </div>
 
             <form onSubmit={handleRunSimulation} className="space-y-4">
@@ -381,7 +381,9 @@ console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Devi
                     onChange={(e) => setSimForm({ ...simForm, deviceCode: e.target.value })}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
-                    <option value="FP-SIMULATOR-01">FP-SIMULATOR-01 (Simulasi Test)</option>
+                    <option value="FP-SOLUTION-01">FP-SOLUTION-01 (Solution ADMS)</option>
+                    <option value="FP-ZKTECO-01">FP-ZKTECO-01 (ZKTeco ADMS)</option>
+                    <option value="FP-HIKVISION-01">FP-HIKVISION-01 (Hikvision ISAPI)</option>
                     {devices.map((dev) => (
                       <option key={dev.id} value={dev.deviceCode}>
                         {dev.name} ({dev.deviceCode})
@@ -424,154 +426,135 @@ console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Devi
                     onChange={(e) => setSimForm({ ...simForm, verifyMode: e.target.value })}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-medium"
                   >
-                    <option value="FINGERPRINT">FINGERPRINT (Sidik Jari)</option>
-                    <option value="FACE">FACE RECOGNITION (Wajah)</option>
-                    <option value="CARD">RFID CARD (Kartu)</option>
+                    <option value="FINGERPRINT">Sidik Jari (Fingerprint)</option>
+                    <option value="FACE">Wajah (Facial Recognition)</option>
+                    <option value="CARD">Kartu RFID / E-KTP</option>
+                    <option value="PASSWORD">PIN / Password</option>
                   </select>
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={simulating}
-                  className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center gap-2 disabled:opacity-50"
-                >
-                  <Send className="h-4 w-4" />
-                  {simulating ? "Mengirim Webhook..." : "Kirim Simulasi Scan Fingerprint"}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={simulating}
+                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+                {simulating ? "Kirimkan Test Push Webhook..." : "Jalankan Simulasi Realtime Push Webhook"}
+              </button>
             </form>
           </div>
-
         </div>
 
-        {/* Right Column (1 Col): Webhook Endpoint Info & API Guide */}
+        {/* Right Column: Protocols Supported & Statistics */}
         <div className="space-y-6">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-            <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-teal-600" /> Informasi Webhook Endpoint
-            </h2>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <span className="text-gray-500 font-medium block mb-1">URL Realtime Webhook Receiver:</span>
-                <div className="p-2.5 bg-gray-900 text-teal-400 font-mono text-[11px] rounded-xl flex items-center justify-between border border-gray-800">
-                  <span className="truncate">/api/integrations/fingerprint</span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/api/integrations/fingerprint`);
-                      setCopiedToken("url");
-                      setTimeout(() => setCopiedToken(null), 2000);
-                    }}
-                    className="text-gray-400 hover:text-white ml-2"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                {copiedToken === "url" && <span className="text-[10px] text-emerald-600 font-bold">✓ URL tersalin!</span>}
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <Server className="h-4 w-4 text-teal-600" /> Protokol Mesin yang Didukung
+            </h3>
+            <div className="space-y-2 text-xs">
+              <div className="p-3 bg-teal-50 text-teal-900 rounded-xl border border-teal-100">
+                <span className="font-bold block">1. Solution / ZKTeco ADMS</span>
+                Protokol HTTP Push `iclock/cdata`. Mengirim data instan saat jari ditempelkan.
               </div>
-
-              <div>
-                <span className="text-gray-500 font-medium block mb-1">Metode HTTP:</span>
-                <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
-                  POST (JSON / ADMS cdata)
-                </span>
+              <div className="p-3 bg-blue-50 text-blue-900 rounded-xl border border-blue-100">
+                <span className="font-bold block">2. Hikvision ISAPI Event Push</span>
+                Protokol HTTP Listener JSON/XML dari terminal Hikvision Facial/Card Reader.
               </div>
-
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 space-y-1">
-                <p className="font-bold flex items-center gap-1">
-                  <Info className="h-3.5 w-3.5 text-amber-600" /> Pengaturan Mesin Solution / ZKTeco:
-                </p>
-                <p className="text-[11px]">
-                  Aktifkan fitur <strong>ADMS / Cloud Web Server</strong> pada menu network mesin fingerprint, lalu isi Web Domain dengan URL SmartHRIS di atas.
-                </p>
+              <div className="p-3 bg-indigo-50 text-indigo-900 rounded-xl border border-indigo-100">
+                <span className="font-bold block">3. REST API Webhook</span>
+                Format JSON standar `POST /api/biometric/push` untuk integrasi custom app/bridge.
               </div>
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Bottom Section: Realtime Incoming Biometric Scan Log Stream */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <Clock className="h-5 w-5 text-teal-600" /> Feed Log Scan Biometric Realtime
             </h2>
-            <p className="text-xs text-gray-500">Log perekaman transaksi masuk dari seluruh mesin fingerprint terhubung</p>
+            <p className="text-xs text-gray-500">Log kehadiran langsung dari mesin sidik jari/wajah fisik</p>
           </div>
-
           <button
             onClick={fetchLogs}
-            className="p-2 text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-            title="Refresh Log Stream"
+            className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh Feed
           </button>
         </div>
 
-        {loading ? (
-          <div className="py-12 text-center">
-            <LoadingSpinner />
-          </div>
-        ) : logs.length === 0 ? (
-          <div className="py-8 text-center text-xs text-gray-500">
+        {logs.length === 0 ? (
+          <div className="py-8 text-center text-xs text-gray-400">
             Belum ada data scan biometric diterima.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
+            <table className="w-full text-xs text-left text-gray-600">
+              <thead className="bg-gray-50 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4">Waktu Scan</th>
-                  <th className="py-3 px-4">Perangkat Mesin</th>
-                  <th className="py-3 px-4">PIN / NIK</th>
-                  <th className="py-3 px-4">Match Karyawan SmartHRIS</th>
-                  <th className="py-3 px-4">Mode Scan</th>
-                  <th className="py-3 px-4">Status Integrasi</th>
+                  <th className="px-4 py-3">Waktu Scan</th>
+                  <th className="px-4 py-3">Mesin / Device</th>
+                  <th className="px-4 py-3">PIN / NIK</th>
+                  <th className="px-4 py-3">Karyawan SmartHRIS</th>
+                  <th className="px-4 py-3">Tipe Presensi</th>
+                  <th className="px-4 py-3">Verifikasi</th>
+                  <th className="px-4 py-3 text-right">Status Match</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 font-medium">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-teal-50/20 transition-colors">
-                    <td className="py-3 px-4 font-mono text-gray-700">
+                  <tr key={log.id} className="hover:bg-gray-50 transition">
+                    <td className="px-4 py-3 font-mono font-bold text-gray-900">
                       {formatDate(log.timestamp)}
                     </td>
-                    <td className="py-3 px-4 font-semibold text-gray-800">
-                      {log.device ? `${log.device.name} (${log.device.deviceCode})` : log.deviceId}
+                    <td className="px-4 py-3">
+                      <span className="font-bold text-gray-800">{log.device?.name || log.deviceId}</span>
+                      <span className="text-[10px] text-gray-400 block font-mono">
+                        IP: {log.device?.ipAddress || "Local LAN"}
+                      </span>
                     </td>
-                    <td className="py-3 px-4 font-mono font-bold text-teal-800">
-                      {log.employeePin}
-                    </td>
-                    <td className="py-3 px-4">
+                    <td className="px-4 py-3 font-mono font-bold text-teal-700">{log.employeePin}</td>
+                    <td className="px-4 py-3 font-semibold">
                       {log.employee ? (
                         <div>
-                          <p className="font-bold text-gray-900">
+                          <span className="text-gray-900 font-bold">
                             {log.employee.firstName} {log.employee.lastName}
-                          </p>
-                          <p className="text-[10px] text-gray-400">{log.employee.department}</p>
+                          </span>
+                          <span className="text-[10px] text-gray-400 block">{log.employee.department}</span>
                         </div>
                       ) : (
-                        <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[10px] font-semibold">
-                          ⚠️ Tidak Ditemukan
+                        <span className="text-rose-500 font-bold flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" /> NIK Belum Terdaftar
                         </span>
                       )}
                     </td>
-                    <td className="py-3 px-4 font-medium">
-                      <span className="px-2 py-1 bg-gray-100 rounded text-gray-700 font-mono text-[10px]">
-                        {log.verifyMode} ({log.scanType})
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                          log.scanType === "CHECK_IN"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : log.scanType === "CHECK_OUT"
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-blue-50 text-blue-700"
+                        )}
+                      >
+                        {log.scanType}
                       </span>
                     </td>
-                    <td className="py-3 px-4">
-                      {log.isProcessed ? (
-                        <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded font-semibold text-[10px]">
-                          ✓ Tersimpan ke Absensi
+                    <td className="px-4 py-3 text-gray-500">{log.verifyMode}</td>
+                    <td className="px-4 py-3 text-right">
+                      {log.employee ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 text-[10px] font-bold rounded-full">
+                          <CheckCircle2 className="h-3 w-3" /> MATCHED
                         </span>
                       ) : (
-                        <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded text-[10px]">
-                          Pending
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 text-[10px] font-bold rounded-full">
+                          UNMATCHED
                         </span>
                       )}
                     </td>
@@ -583,118 +566,107 @@ console.log('⚡ SmartHRIS Bridge Agent active listening to LAN Fingerprint Devi
         )}
       </div>
 
-      {/* Modal Tambah Perangkat Fingerprint */}
-      {showDeviceModal && (
-        <Modal
-          isOpen={showDeviceModal}
-          onClose={() => setShowDeviceModal(false)}
-          title="Daftarkan Mesin Fingerprint Baru"
-        >
-          <form onSubmit={handleCreateDevice} className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-gray-700 block mb-1">Kode Perangkat (SN / Code) *</label>
-              <input
-                type="text"
-                required
-                value={newDevice.deviceCode}
-                onChange={(e) => setNewDevice({ ...newDevice, deviceCode: e.target.value })}
-                placeholder="Contoh: FP-HQ-01 ATAU SN MESIN (Misal: FP98237)"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-mono font-bold uppercase"
-              />
-            </div>
+      {/* Guide Modal */}
+      {showGuideModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Terminal className="h-5 w-5 text-teal-600" /> Panduan Pengesetan Mesin Fisik
+            </h2>
+            <div className="space-y-3 text-xs text-gray-600">
+              <div className="p-3 bg-gray-50 rounded-xl space-y-1">
+                <p className="font-bold text-gray-800">1. Solution / ZKTeco (Menu Mesin ADMS):</p>
+                <ol className="list-disc pl-4 space-y-0.5">
+                  <li>Masuk ke Menu Mesin -&gt; Komunikasi -&gt; ADMS / Cloud Server.</li>
+                  <li>Isi Server Domain / IP: {baseUrl ? new URL(baseUrl).hostname : "domain.com"}</li>
+                  <li>Isi Web Push / Path URL: <code>/api/biometric/push</code></li>
+                  <li>Simpan & Restart mesin.</li>
+                </ol>
+              </div>
 
-            <div>
-              <label className="text-xs font-semibold text-gray-700 block mb-1">Nama Mesin Fingerprint *</label>
-              <input
-                type="text"
-                required
-                value={newDevice.name}
-                onChange={(e) => setNewDevice({ ...newDevice, name: e.target.value })}
-                placeholder="Contoh: Mesin Solution X100-C Lobi Utama"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-medium"
-              />
+              <div className="p-3 bg-gray-50 rounded-xl space-y-1">
+                <p className="font-bold text-gray-800">2. Hikvision (Web Admin ISAPI):</p>
+                <ol className="list-disc pl-4 space-y-0.5">
+                  <li>Login Web Admin Mesin -&gt; Network -&gt; Advanced -&gt; HTTP Listening / Event Push.</li>
+                  <li>Isi Destination IP / Domain: {baseUrl ? new URL(baseUrl).hostname : "domain.com"}</li>
+                  <li>Isi Destination URL: <code>/api/biometric/push</code></li>
+                  <li>Pilih Payload Format: JSON.</li>
+                </ol>
+              </div>
             </div>
-
-            <div>
-              <label className="text-xs font-semibold text-gray-700 block mb-1">Lokasi Pemasangan</label>
-              <input
-                type="text"
-                value={newDevice.location}
-                onChange={(e) => setNewDevice({ ...newDevice, location: e.target.value })}
-                placeholder="Kantor Pusat Gedung A Lt. 1"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-gray-700 block mb-1">IP Address Mesin (Opsional jika LAN)</label>
-              <input
-                type="text"
-                value={newDevice.ipAddress}
-                onChange={(e) => setNewDevice({ ...newDevice, ipAddress: e.target.value })}
-                placeholder="192.168.1.201"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm font-mono"
-              />
-            </div>
-
-            <div className="pt-2 flex justify-end gap-2 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setShowDeviceModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-md"
-              >
-                Simpan Pendaftaran Perangkat
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* Modal Code Local Agent Bridge */}
-      {showBridgeModal && (
-        <Modal
-          isOpen={showBridgeModal}
-          onClose={() => setShowBridgeModal(false)}
-          title="Script Local LAN Bridge Agent (Node.js)"
-        >
-          <div className="space-y-4">
-            <p className="text-xs text-gray-600">
-              Gunakan kode Node.js ini pada komputer/server lokal kantor yang terhubung ke IP Mesin Fingerprint via LAN (Port 4370 UDP/TCP) untuk meneruskan data scan ke SmartHRIS.
-            </p>
-
-            <div className="relative">
-              <pre className="p-4 bg-gray-900 text-teal-300 font-mono text-xs rounded-xl overflow-x-auto max-h-80">
-                {bridgeCodeSnippet}
-              </pre>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(bridgeCodeSnippet);
-                  alert("Kode Bridge Agent tersalin!");
-                }}
-                className="absolute top-3 right-3 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-lg backdrop-blur-md flex items-center gap-1"
-              >
-                <Copy className="h-3.5 w-3.5" /> Salin Kode
-              </button>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setShowBridgeModal(false)}
-                className="px-4 py-2 text-xs font-bold text-white bg-teal-600 rounded-xl"
-              >
-                Tutup
-              </button>
-            </div>
+            <button
+              onClick={() => setShowGuideModal(false)}
+              className="w-full py-2.5 bg-gray-900 text-white font-bold text-xs rounded-xl"
+            >
+              Tutup Panduan
+            </button>
           </div>
-        </Modal>
+        </div>
       )}
 
+      {/* Add Device Modal */}
+      {showDeviceModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Cpu className="h-5 w-5 text-teal-600" /> Pendaftaran Mesin Baru
+            </h2>
+
+            <form onSubmit={handleCreateDevice} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">Kode Mesin / Serial Number (SN) *</label>
+                <input
+                  type="text"
+                  required
+                  value={newDevice.deviceCode}
+                  onChange={(e) => setNewDevice({ ...newDevice, deviceCode: e.target.value })}
+                  placeholder="Contoh: FP-LOBI-01 atau SN Mesin"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">Nama Perangkat *</label>
+                <input
+                  type="text"
+                  required
+                  value={newDevice.name}
+                  onChange={(e) => setNewDevice({ ...newDevice, name: e.target.value })}
+                  placeholder="Contoh: Mesin Solution Lobi Utama"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">Lokasi Pemasangan</label>
+                <input
+                  type="text"
+                  value={newDevice.location}
+                  onChange={(e) => setNewDevice({ ...newDevice, location: e.target.value })}
+                  placeholder="Contoh: Gedung A Lt 1"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeviceModal(false)}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl"
+                >
+                  Simpan Mesin
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
