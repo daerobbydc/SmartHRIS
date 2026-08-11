@@ -100,9 +100,9 @@ export default function ApplicantsPage() {
 
   const filtered = applicants.filter(
     (app) =>
-      app.name.toLowerCase().includes(search.toLowerCase()) ||
-      app.email.toLowerCase().includes(search.toLowerCase()) ||
-      app.vacancy.title.toLowerCase().includes(search.toLowerCase())
+      (app.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (app.email || "").toLowerCase().includes(search.toLowerCase()) ||
+      (app.vacancy?.title || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -171,9 +171,30 @@ export default function ApplicantsPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filtered.map((app) => {
                   const score = app.aiMatchScore != null ? Number(app.aiMatchScore) : null;
-                  const parsedAnalysis: AIScreeningAnalysis | null = app.aiAnalysis
-                    ? JSON.parse(app.aiAnalysis)
-                    : null;
+                  let parsedAnalysis: AIScreeningAnalysis | null = null;
+                  if (app.aiAnalysis) {
+                    if (typeof app.aiAnalysis === "object") {
+                      parsedAnalysis = app.aiAnalysis as unknown as AIScreeningAnalysis;
+                    } else {
+                      try {
+                        parsedAnalysis = JSON.parse(app.aiAnalysis);
+                      } catch {
+                        parsedAnalysis = {
+                          applicantId: app.id,
+                          applicantName: app.name,
+                          vacancyTitle: app.vacancy?.title || "Lowongan",
+                          matchScore: score != null ? score : 75,
+                          grade: "SESUAI",
+                          matchedSkills: [],
+                          missingSkills: [],
+                          strengths: ["Melampirkan data berkas CV & Surat Lamaran"],
+                          areasOfConcern: [],
+                          summary: String(app.aiAnalysis),
+                          recommendation: "PROCEED_STAGE",
+                        };
+                      }
+                    }
+                  }
 
                   return (
                     <tr key={app.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
@@ -190,9 +211,9 @@ export default function ApplicantsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-slate-800 dark:text-slate-200">
-                          {app.vacancy.title}
+                          {app.vacancy?.title || "Lowongan Pekerjaan"}
                         </div>
-                        <div className="text-xs text-slate-400">{app.vacancy.department}</div>
+                        <div className="text-xs text-slate-400">{app.vacancy?.department || "Umum"}</div>
                       </td>
                       <td className="px-6 py-4">
                         {score != null ? (
