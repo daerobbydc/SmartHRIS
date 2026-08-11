@@ -3,10 +3,12 @@ import { NextResponse, NextRequest } from "next/server";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip proxy for API routes, static files, and NextAuth routes
+  // Skip proxy for API routes, static files, public careers portal, and NextAuth routes
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/careers") ||
+    pathname.startsWith("/careers") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.includes(".")

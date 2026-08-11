@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Briefcase, Users, MapPin, Calendar, X, DollarSign, FileText, Target, Building2, Sparkles, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Plus, Briefcase, Users, MapPin, Calendar, X, DollarSign, FileText, Target, Building2, Sparkles, ChevronRight, CheckCircle2, Share2, ExternalLink, Copy } from "lucide-react";
 import { formatDate, getStatusLabel, getVacancyTypeLabel } from "@/lib/utils";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 
@@ -25,6 +25,16 @@ export default function RekrutmenPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = (vacancyId?: string) => {
+    const url = vacancyId
+      ? `${window.location.origin}/careers?id=${vacancyId}`
+      : `${window.location.origin}/careers`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(vacancyId || "all");
+    setTimeout(() => setCopiedId(null), 3000);
+  };
 
   const [formData, setFormData] = useState({
     title: "",
@@ -105,12 +115,39 @@ export default function RekrutmenPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-teal-600/25 hover:from-teal-700 hover:to-teal-800 active:scale-95 transition"
-        >
-          <Plus className="h-4 w-4" /> Buat Lowongan Baru
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleCopyLink()}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition"
+            title="Salin Link Portal Karir Publik"
+          >
+            {copiedId === "all" ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Link Tersalin!
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4 text-teal-600" /> Salin Link Karir
+              </>
+            )}
+          </button>
+
+          <a
+            href="/careers"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2.5 text-xs font-bold text-teal-700 hover:bg-teal-100 dark:border-teal-900 dark:bg-teal-950 dark:text-teal-300 transition"
+          >
+            <ExternalLink className="h-4 w-4" /> Portal Karir Publik
+          </a>
+
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-teal-600/25 hover:from-teal-700 hover:to-teal-800 active:scale-95 transition"
+          >
+            <Plus className="h-4 w-4" /> Buat Lowongan Baru
+          </button>
+        </div>
       </div>
 
       {/* Top Stat Overview */}
@@ -243,6 +280,22 @@ export default function RekrutmenPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleCopyLink(vacancy.id)}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300 transition flex items-center gap-1"
+                    title="Salin Link Lowongan ke Clipboard"
+                  >
+                    {copiedId === vacancy.id ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Tersalin
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5 text-teal-600" /> Salin Link
+                      </>
+                    )}
+                  </button>
+
                   <button
                     onClick={() =>
                       (window.location.href = `/rekrutmen/applicants?vacancy=${vacancy.id}`)
