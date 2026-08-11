@@ -21,22 +21,32 @@ export default function LoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         redirect: false,
+        callbackUrl: "/dashboard",
       });
 
       if (result?.error) {
+        setError("Email atau kata sandi tidak cocok. Silakan periksa kembali data login Anda.");
+        setLoading(false);
+      } else if (result?.ok || result?.url) {
+        window.location.href = "/dashboard";
+      } else {
+        window.location.href = "/dashboard";
+      }
+    } catch (err: any) {
+      console.error("Login process info/catch:", err);
+      if (
+        err?.type === "CredentialsSignin" ||
+        String(err?.message || err).includes("CredentialsSignin") ||
+        String(err?.message || err).includes("Credentials")
+      ) {
         setError("Email atau kata sandi tidak cocok. Silakan periksa kembali email & password Anda.");
         setLoading(false);
       } else {
-        // Direct window navigation guarantees cookie propagation and fresh server session load
         window.location.href = "/dashboard";
       }
-    } catch (err) {
-      console.error("Login error:", err);
-      setError("Terjadi kesalahan server saat proses login. Silakan coba lagi.");
-      setLoading(false);
     }
   };
 
@@ -121,7 +131,7 @@ export default function LoginPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl"
+                  className="p-4 text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-xl"
                 >
                   {error}
                 </motion.div>
@@ -137,7 +147,7 @@ export default function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-sm font-medium"
                     placeholder="email@smarthris.com"
                     required
                   />
@@ -154,7 +164,7 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                    className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-sm font-medium"
                     placeholder="Masukkan kata sandi"
                     required
                   />
@@ -192,8 +202,9 @@ export default function LoginPage() {
                   onClick={() => {
                     setEmail(acc.email);
                     setPassword(acc.pass);
+                    setError("");
                   }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left group"
+                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left group border border-slate-100"
                 >
                   <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${acc.color} text-white text-xs font-bold`}>
                     {acc.role[0]}
@@ -202,8 +213,8 @@ export default function LoginPage() {
                     <p className="text-sm font-medium text-gray-900">{acc.role}</p>
                     <p className="text-xs text-gray-500 truncate">{acc.email}</p>
                   </div>
-                  <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Klik untuk isi
+                  <span className="text-xs text-teal-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                    Gunakan Akun
                   </span>
                 </button>
               ))}
