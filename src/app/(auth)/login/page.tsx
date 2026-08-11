@@ -27,13 +27,14 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError("Email atau kata sandi salah");
+        setError("Email atau kata sandi tidak cocok. Silakan periksa kembali email & password Anda.");
       } else {
         router.push("/dashboard");
         router.refresh();
       }
-    } catch {
-      setError("Terjadi kesalahan, silakan coba lagi");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Terjadi kesalahan server saat proses login. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }

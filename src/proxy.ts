@@ -1,44 +1,4 @@
 import { NextResponse, NextRequest } from "next/server";
-import { canAccessRoute } from "@/lib/permissions";
-
-// Route protection mapping - which routes need which permissions
-const PROTECTED_ROUTES: Record<string, string> = {
-  // Dashboard - all authenticated users
-  "/dashboard": "",
-
-  // Employees
-  "/employees": "employee:read",
-  "/employees/new": "employee:write",
-
-  // Personalia
-  "/personalia/documents": "employee:read",
-  "/personalia/training": "employee:read",
-
-  // Absensi
-  "/absensi/schedule": "attendance:read",
-  "/absensi/overtime": "attendance:read",
-  "/absensi/sanctions": "attendance:write",
-
-  // Leave
-  "/leave/history": "leave:read",
-
-  // Payroll
-  "/payroll": "payroll:read",
-  "/payroll/components": "payroll:write",
-  "/payroll/thr": "payroll:read",
-
-  // Recruitment
-  "/rekrutmen": "recruitment:read",
-  "/rekrutmen/blacklist": "recruitment:read",
-
-  // Performance
-  "/performance": "performance:read",
-  "/performance/feedback": "performance:read",
-
-  // ESS
-  "/ess": "leave:write",
-  "/ess/approval": "leave:approve",
-};
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -54,9 +14,12 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for NextAuth session cookie
-  const sessionCookie = request.cookies.get("authjs.session-token") ||
-                        request.cookies.get("__Secure-authjs.session-token");
+  // Check for NextAuth / Auth.js session cookies (supports both HTTP & HTTPS Vercel production)
+  const sessionCookie =
+    request.cookies.get("authjs.session-token") ||
+    request.cookies.get("__Secure-authjs.session-token") ||
+    request.cookies.get("next-auth.session-token") ||
+    request.cookies.get("__Secure-next-auth.session-token");
 
   const isLoggedIn = !!sessionCookie;
   const isAuthPage = pathname.startsWith("/login");
@@ -75,10 +38,6 @@ export function proxy(request: NextRequest) {
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
-
-  // Extract role from cookie or JWT (simplified - in production use proper JWT decode)
-  // For now, we check basic access without role from proxy
-  // RBAC is enforced in API routes via checkAuth()
 
   return NextResponse.next();
 }
