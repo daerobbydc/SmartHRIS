@@ -1,20 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { hasPermission, type Permission } from "@/lib/permissions";
+import { checkRateLimit, createRateLimitResponse, getClientIp, type RATE_LIMIT_PRESETS } from "@/lib/rate-limit";
 
 interface AuthCheckOptions {
   requiredPermission?: Permission;
   requireAnyPermission?: Permission[];
+  rateLimitPreset?: keyof typeof RATE_LIMIT_PRESETS;
 }
 
 /**
- * Check authentication and permissions for API routes
- * Returns null if authorized, or NextResponse with error if not
+ * Check authentication, rate limits, and permissions for API routes
+ * Returns { userId, role } if authorized, or NextResponse with error/rate limit if not
  */
 export async function checkAuth(
   request: NextRequest,
   options: AuthCheckOptions = {}
 ): Promise<{ userId: string; role: string } | NextResponse> {
+  // Apply Rate Limiting if requested or default to API limit
+  const clientIp = getClientIp(request);
+  const preset = options.rateLimitPreset || "API";
+  const rateLimitResult = checkRateLimit(`api:${clientIp}`, preset);
+
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || "smarthris-super-secret-key-change-in-production-2024",

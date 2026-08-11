@@ -1,7 +1,17 @@
 import { NextResponse, NextRequest } from "next/server";
+import { checkRateLimit, createRateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Rate limit login page access
+  if (pathname.startsWith("/login")) {
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(`login-page:${clientIp}`, "AUTH");
+    if (!rateLimit.success) {
+      return createRateLimitResponse(rateLimit);
+    }
+  }
 
   // Skip proxy for API routes, static files, public careers portal, and NextAuth routes
   if (
